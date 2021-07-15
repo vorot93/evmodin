@@ -26,10 +26,22 @@ sha3 = "0.9"
 strum_macros = "0.21"
 
 [dev-dependencies]
+criterion = { version = "0.3", default-features = false, features = [
+    "async_tokio",
+] }
 evmodin-test = { path = ".", package = "evmodin", features = ["util"] }
 hex-literal = "0.3"
+include_dir = "0.6"
+pprof = { version = "0.4", features = ["flamegraph"] }
 rand = { version = "0.8", features = ["std"] }
 tokio = { version = "1", features = ["full"] }
 
 [features]
 util = ["educe/Debug", "hex-literal", "parking_lot"]
+
+[[bench]]
+name = "bench"
+harness = false
+
+[profile.bench]
+debug = true

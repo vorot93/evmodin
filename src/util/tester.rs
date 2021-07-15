@@ -8,15 +8,26 @@ use educe::Educe;
 use ethereum_types::{Address, U256};
 use std::{future::Future, pin::Pin, sync::Arc};
 
-async fn exec(host: &mut MockedHost, revision: Revision, message: Message, code: Bytes) -> Output {
+async fn exec(
+    host: &mut MockedHost,
+    revision: Revision,
+    message: Message,
+    code: impl Into<Vec<u8>>,
+    collect_traces: bool,
+) -> Output {
     // Add EIP-2929 tweak.
     if revision >= Revision::Berlin {
         host.access_account(message.sender).await.unwrap();
         host.access_account(message.destination).await.unwrap();
     }
-    AnalyzedCode::analyze(code)
-        .execute(host, &mut StdoutTracer::default(), message, revision)
-        .await
+    let c = AnalyzedCode::analyze(code);
+
+    if collect_traces {
+        c.execute(host, &mut StdoutTracer::default(), message, revision)
+            .await
+    } else {
+        c.execute(host, &mut NoopTracer, message, revision).await
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -53,10 +64,11 @@ pub struct EvmTester {
     inspect_fn: Arc<dyn Fn(&MockedHost, &Message, &[u8]) + 'static>,
     revision: Revision,
     message: Message,
-    code: Bytes,
+    code: Vec<u8>,
     gas_check: Option<GasCheck>,
     expected_status_codes: Option<Vec<StatusCode>>,
     expected_output_data: Option<Vec<u8>>,
+    collect_traces: bool,
 }
 
 impl Default for EvmTester {
@@ -85,16 +97,17 @@ impl EvmTester {
                 input_data: Bytes::new(),
                 value: 0.into(),
             },
-            code: Bytes::new(),
+            code: Vec::new(),
             gas_check: None,
             expected_status_codes: None,
             expected_output_data: None,
+            collect_traces: false,
         }
     }
 
     /// Set code to be executed.
     pub fn code(mut self, code: impl Into<Bytecode>) -> Self {
-        self.code = code.into().build().into();
+        self.code = code.into().build();
         self
     }
 
@@ -226,6 +239,11 @@ impl EvmTester {
         self
     }
 
+    pub fn collect_traces(mut self, doit: bool) -> Self {
+        self.collect_traces = doit;
+        self
+    }
+
     /// Execute provided code, run checks and return bytecode returned by EVM.
     pub async fn check_and_get_result(mut self) -> Output {
         println!("Executing code: {}", hex::encode(&self.code));
@@ -242,7 +260,14 @@ impl EvmTester {
                 }
             }
         }
-        let output = exec(&mut host, self.revision, self.message.clone(), self.code).await;
+        let output = exec(
+            &mut host,
+            self.revision,
+            self.message.clone(),
+            self.code,
+            self.collect_traces,
+        )
+        .await;
 
         if let Some(status_codes) = self.expected_status_codes {
             if !status_codes.iter().any(|s| *s == output.status_code) {

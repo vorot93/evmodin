@@ -1201,8 +1201,6 @@ async fn calldatacopy_memory_cost() {
     }
 }
 
-const MAX_CODE_SIZE: usize = 0x6000;
-
 #[tokio::test]
 async fn max_code_size_push1() {
     let mut code = Bytecode::new();

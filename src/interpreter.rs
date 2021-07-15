@@ -12,11 +12,7 @@ fn check_requirements(
     state: &mut ExecutionState,
     op: OpCode,
 ) -> Result<(), StatusCode> {
-    let metrics = if let Some(v) = instruction_table[op.to_usize()] {
-        v
-    } else {
-        return Err(StatusCode::UndefinedInstruction);
-    };
+    let metrics = &instruction_table[op.to_usize()].ok_or(StatusCode::UndefinedInstruction)?;
 
     state.gas_left -= metrics.gas_cost as i64;
     if state.gas_left < 0 {
@@ -52,8 +48,8 @@ pub struct AnalyzedCode {
 
 impl AnalyzedCode {
     /// Analyze code and prepare it for execution.
-    pub fn analyze(code: impl AsRef<[u8]>) -> Self {
-        let code = code.as_ref();
+    pub fn analyze(code: impl Into<Vec<u8>>) -> Self {
+        let code = code.into();
         let mut jumpdest_map = vec![false; code.len()];
 
         let mut i = 0;
@@ -100,8 +96,8 @@ impl AnalyzedCode {
             }
         }
 
-        let mut padded_code = vec![0_u8; i + 1];
-        padded_code[..code.len()].copy_from_slice(code);
+        let mut padded_code = code;
+        padded_code.resize(i + 1, 0);
         padded_code[i] = OpCode::STOP.to_u8();
 
         let jumpdest_map = JumpdestMap(jumpdest_map);
@@ -129,7 +125,9 @@ impl AnalyzedCode {
             },
         };
 
-        tracer.notify_execution_end(&output);
+        if !T::DUMMY {
+            tracer.notify_execution_end(&output);
+        }
 
         output
     }
@@ -140,7 +138,13 @@ impl AnalyzedCode {
         tracer: &mut T,
         state: &mut ExecutionState,
     ) -> Result<SuccessfulOutput, StatusCode> {
-        tracer.notify_execution_start(state.evm_revision, state.message.clone(), self.code.clone());
+        if !T::DUMMY {
+            tracer.notify_execution_start(
+                state.evm_revision,
+                state.message.clone(),
+                self.code.clone(),
+            );
+        }
 
         let instruction_table = get_baseline_instruction_table(state.evm_revision);
 

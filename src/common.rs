@@ -39,8 +39,8 @@ pub enum Revision {
 }
 
 impl Revision {
-    pub fn iter() -> impl Iterator<Item = Self> {
-        (&[
+    pub fn iter() -> impl IntoIterator<Item = Self> {
+        [
             Self::Frontier,
             Self::Homestead,
             Self::Tangerine,
@@ -51,9 +51,7 @@ impl Revision {
             Self::Istanbul,
             Self::Berlin,
             Self::London,
-        ])
-            .iter()
-            .copied()
+        ]
     }
 
     pub const fn len() -> usize {

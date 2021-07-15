@@ -1,9 +1,10 @@
 use crate::opcode::*;
 use core::iter::repeat;
 use ethereum_types::U256;
+use std::ops::{Add, Mul};
 
 /// EVM bytecode builder.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Bytecode {
     inner: Vec<u8>,
 }
@@ -116,6 +117,14 @@ impl Bytecode {
     pub fn build(self) -> Vec<u8> {
         self.inner
     }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl From<U256> for Bytecode {
@@ -144,12 +153,44 @@ impl From<Vec<u8>> for Bytecode {
     }
 }
 
+impl AsRef<[u8]> for Bytecode {
+    fn as_ref(&self) -> &[u8] {
+        &self.inner
+    }
+}
+
 impl IntoIterator for Bytecode {
     type Item = u8;
     type IntoIter = <Vec<u8> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.inner.into_iter()
+    }
+}
+
+impl Mul<Bytecode> for usize {
+    type Output = Bytecode;
+
+    fn mul(self, rhs: Bytecode) -> Self::Output {
+        repeat(rhs)
+            .take(self)
+            .fold(Bytecode::new(), |acc, b| acc.append_bc(b))
+    }
+}
+
+impl Mul<OpCode> for usize {
+    type Output = Bytecode;
+
+    fn mul(self, rhs: OpCode) -> Self::Output {
+        self.mul(Bytecode::from(rhs))
+    }
+}
+
+impl<T: Into<Bytecode>> Add<T> for Bytecode {
+    type Output = Bytecode;
+
+    fn add(self, rhs: T) -> Self::Output {
+        self.append_bc(rhs)
     }
 }
 
@@ -232,5 +273,21 @@ impl From<CallInstruction> for Bytecode {
             b = b.pushv(call.value);
         }
         b.pushv(call.address).pushv(call.gas).opcode(call.op)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multiply_bytecode() {
+        assert_eq!(
+            3 * Bytecode::new().opcode(OpCode::POP),
+            Bytecode::new()
+                .opcode(OpCode::POP)
+                .opcode(OpCode::POP)
+                .opcode(OpCode::POP)
+        )
     }
 }

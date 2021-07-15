@@ -46,6 +46,8 @@ pub use host::Host;
 pub use interpreter::AnalyzedCode;
 pub use opcode::OpCode;
 
+pub const MAX_CODE_SIZE: usize = 0x6000;
+
 mod common;
 pub mod host;
 #[doc(hidden)]

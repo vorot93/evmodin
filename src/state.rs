@@ -32,7 +32,7 @@ impl Stack {
     }
 
     pub fn push(&mut self, v: U256) {
-        self.0.push(v)
+        unsafe { self.0.push_unchecked(v) }
     }
 
     pub fn pop(&mut self) -> U256 {
