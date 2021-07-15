@@ -38,7 +38,21 @@ fn check_requirements(
 pub struct JumpdestMap(Vec<bool>);
 
 impl JumpdestMap {
-    pub fn analyze(code: &[u8]) -> Self {
+    pub fn contains(&self, dst: U256) -> bool {
+        dst < self.0.len().into() && self.0[dst.as_usize()]
+    }
+}
+
+/// Code with analysis.
+pub struct AnalyzedCode {
+    jumpdest_map: JumpdestMap,
+    code: Bytes,
+}
+
+impl AnalyzedCode {
+    /// Analyze code and prepare it for execution.
+    pub fn analyze(code: impl AsRef<[u8]>) -> Self {
+        let code = code.as_ref();
         let mut jumpdest_map = vec![false; code.len()];
 
         let mut i = 0;
@@ -80,33 +94,19 @@ impl JumpdestMap {
                 | OpCode::PUSH29
                 | OpCode::PUSH30
                 | OpCode::PUSH31
-                | OpCode::PUSH32 => opcode.to_usize() - OpCode::PUSH1.to_usize() + 1,
+                | OpCode::PUSH32 => opcode.to_usize() - OpCode::PUSH1.to_usize() + 2,
                 _ => 1,
             }
         }
 
-        Self(jumpdest_map)
-    }
+        let mut padded_code = vec![0_u8; i + 1];
+        padded_code[..code.len()].copy_from_slice(code);
+        padded_code[i] = OpCode::STOP.to_u8();
 
-    pub fn contains(&self, dst: U256) -> bool {
-        dst < self.0.len().into() && self.0[dst.as_usize()]
-    }
-}
+        let jumpdest_map = JumpdestMap(jumpdest_map);
+        let code = padded_code.into();
 
-/// Code with analysis.
-pub struct AnalyzedCode {
-    jumpdest_map: JumpdestMap,
-    code: Bytes,
-}
-
-impl AnalyzedCode {
-    /// Analyze code and prepare it for execution.
-    pub fn analyze(code: impl Into<Bytes>) -> Self {
-        let code = code.into();
-        Self {
-            jumpdest_map: JumpdestMap::analyze(&code),
-            code,
-        }
+        Self { jumpdest_map, code }
     }
 
     /// Execute analyzed EVM bytecode.
@@ -131,20 +131,17 @@ impl AnalyzedCode {
 
         let instruction_table = get_baseline_instruction_table(state.evm_revision);
 
-        let mut status = StatusCode::Success;
+        let mut status;
 
         let mut pc = 0;
 
         loop {
-            // Reached the end of code
-            if pc >= self.code.len() {
-                debug_assert_eq!(pc, self.code.len());
-                break;
-            }
-
             let op = OpCode(self.code[pc]);
 
-            tracer.notify_instruction_start(pc, op, state);
+            // Do not print stop on the final STOP
+            if !T::DUMMY && pc != self.code.len() - 1 {
+                tracer.notify_instruction_start(pc, op, state);
+            }
 
             status = check_requirements(instruction_table, state, op);
             if !matches!(status, StatusCode::Success) {

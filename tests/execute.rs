@@ -20,6 +20,15 @@ async fn empty_code() {
 }
 
 #[tokio::test]
+async fn invalid_push() {
+    EvmTester::new()
+        .code(Bytecode::new().opcode(OpCode::PUSH1))
+        .status(StatusCode::Success)
+        .check()
+        .await;
+}
+
+#[tokio::test]
 async fn push_and_pop() {
     EvmTester::new()
         .code(

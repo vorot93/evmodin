@@ -4,6 +4,9 @@ use serde::Serialize;
 
 /// Passed into execution context to collect metrics.
 pub trait Tracer {
+    #[doc(hidden)]
+    const DUMMY: bool = false;
+
     /// Called when execution starts.
     fn notify_execution_start(&mut self, revision: Revision, message: Message, code: Bytes);
     /// Called on each instruction.
@@ -16,6 +19,8 @@ pub trait Tracer {
 pub struct NoopTracer;
 
 impl Tracer for NoopTracer {
+    const DUMMY: bool = true;
+
     fn notify_execution_start(&mut self, _: Revision, _: Message, _: Bytes) {}
 
     fn notify_instruction_start(&mut self, _: usize, _: OpCode, _: &ExecutionState) {}
