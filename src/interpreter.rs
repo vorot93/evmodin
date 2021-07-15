@@ -9,17 +9,14 @@ use crate::{
 };
 use ethereum_types::{Address, U256};
 use genawaiter::sync::*;
+use std::sync::Arc;
 
 fn check_requirements(
     instruction_table: &InstructionTable,
     state: &mut ExecutionState,
     op: OpCode,
 ) -> Result<(), StatusCode> {
-    let metrics = if let Some(v) = instruction_table[op.to_usize()] {
-        v
-    } else {
-        return Err(StatusCode::UndefinedInstruction);
-    };
+    let metrics = &instruction_table[op.to_usize()].ok_or(StatusCode::UndefinedInstruction)?;
 
     state.gas_left -= metrics.gas_cost as i64;
     if state.gas_left < 0 {
@@ -39,7 +36,7 @@ fn check_requirements(
 }
 
 #[derive(Clone, Debug)]
-pub struct JumpdestMap(Vec<bool>);
+pub struct JumpdestMap(Arc<[bool]>);
 
 impl JumpdestMap {
     pub fn contains(&self, dst: U256) -> bool {
@@ -52,12 +49,13 @@ impl JumpdestMap {
 pub struct AnalyzedCode {
     jumpdest_map: JumpdestMap,
     code: Bytes,
+    padded_code: Bytes,
 }
 
 impl AnalyzedCode {
     /// Analyze code and prepare it for execution.
-    pub fn analyze(code: impl AsRef<[u8]>) -> Self {
-        let code = code.as_ref();
+    pub fn analyze(code: impl Into<Vec<u8>>) -> Self {
+        let code = code.into();
         let mut jumpdest_map = vec![false; code.len()];
 
         let mut i = 0;
@@ -104,21 +102,29 @@ impl AnalyzedCode {
             }
         }
 
-        let mut padded_code = vec![0_u8; i + 1];
-        padded_code[..code.len()].copy_from_slice(code);
+        let code_len = code.len();
+
+        let mut padded_code = code;
+        padded_code.resize(i + 1, 0);
         padded_code[i] = OpCode::STOP.to_u8();
 
-        let jumpdest_map = JumpdestMap(jumpdest_map);
-        let code = padded_code.into();
+        let jumpdest_map = JumpdestMap(jumpdest_map.into());
+        let padded_code = Bytes::from(padded_code);
+        let mut code = padded_code.clone();
+        code.truncate(code_len);
 
-        Self { jumpdest_map, code }
+        Self {
+            jumpdest_map,
+            code,
+            padded_code,
+        }
     }
 
     /// Execute analyzed EVM bytecode using provided `Host` context. Optionally modify the state after each instruction using provided closure.
-    pub fn execute<H: Host, T: Tracer + 'static>(
+    pub fn execute<H: Host, T: Tracer>(
         &self,
         host: &mut H,
-        mut tracer: T,
+        tracer: &mut T,
         state_modifier: StateModifier,
         message: Message,
         revision: Revision,
@@ -127,9 +133,41 @@ impl AnalyzedCode {
             tracer.notify_execution_start(revision, message.clone(), self.code.clone());
         }
 
-        let mut interrupt = self
+        let output = self
             .execute_resumable(!T::DUMMY || state_modifier.is_some(), message, revision)
-            .resume(());
+            .run_to_completion_with_host(host, tracer, state_modifier);
+
+        if !T::DUMMY {
+            tracer.notify_execution_end(&output);
+        }
+
+        output
+    }
+
+    /// Execute in resumable EVM.
+    pub fn execute_resumable(
+        &self,
+        trace: bool,
+        message: Message,
+        revision: Revision,
+    ) -> ExecutionStartInterrupt {
+        let code = self.clone();
+        let inner = Box::pin(Gen::new(move |co| {
+            interpreter_producer(co, code, ExecutionState::new(message, revision), trace)
+        }));
+
+        ExecutionStartInterrupt { inner, data: () }
+    }
+}
+
+impl ExecutionStartInterrupt {
+    pub fn run_to_completion_with_host<H: Host, T: Tracer>(
+        self,
+        host: &mut H,
+        tracer: &mut T,
+        state_modifier: StateModifier,
+    ) -> Output {
+        let mut interrupt = self.resume(());
 
         loop {
             interrupt = match interrupt {
@@ -223,29 +261,10 @@ impl AnalyzedCode {
                         },
                     };
 
-                    if !T::DUMMY {
-                        tracer.notify_execution_end(&output);
-                    }
-
                     return output;
                 }
             };
         }
-    }
-
-    /// Execute in resumable EVM.
-    pub fn execute_resumable(
-        &self,
-        trace: bool,
-        message: Message,
-        revision: Revision,
-    ) -> ExecutionStartInterrupt {
-        let code = self.clone();
-        let inner = Box::pin(Gen::new(move |co| {
-            interpreter_producer(co, code, ExecutionState::new(message, revision), trace)
-        }));
-
-        ExecutionStartInterrupt { inner, data: () }
     }
 }
 
@@ -264,10 +283,10 @@ async fn interpreter_producer(
     let mut pc = 0;
 
     loop {
-        let op = OpCode(s.code[pc]);
+        let op = OpCode(s.padded_code[pc]);
 
         // Do not print stop on the final STOP
-        if trace && pc != s.code.len() - 1 {
+        if trace && pc < s.code.len() {
             if let Some(modifier) = co
                 .yield_(InterruptDataVariant::InstructionStart(Box::new(
                     InstructionStart {
@@ -391,10 +410,10 @@ async fn interpreter_producer(
                 memory::calldatacopy(state)?;
             }
             OpCode::CODESIZE => {
-                memory::codesize(&mut state.stack, &*s.code);
+                memory::codesize(&mut state.stack, &s.code[..]);
             }
             OpCode::CODECOPY => {
-                memory::codecopy(state, &*s.code)?;
+                memory::codecopy(state, &s.code[..])?;
             }
             OpCode::EXTCODESIZE => {
                 extcodesize!(co, state);
@@ -515,7 +534,7 @@ async fn interpreter_producer(
             | OpCode::PUSH32 => {
                 pc += load_push(
                     &mut state.stack,
-                    &s.code[pc + 1..],
+                    &s.padded_code[pc + 1..],
                     op.to_usize() - OpCode::PUSH1.to_usize() + 1,
                 )
             }

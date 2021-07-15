@@ -356,6 +356,8 @@ static LONDON_GAS_COSTS: Lazy<[Option<u16>; 256]> = Lazy::new(|| {
     table
 });
 
+static SHANGHAI_GAS_COSTS: Lazy<[Option<u16>; 256]> = Lazy::new(|| *LONDON_GAS_COSTS);
+
 pub fn gas_costs(revision: Revision) -> &'static [Option<u16>; 256] {
     match revision {
         Revision::Frontier => &FRONTIER_GAS_COSTS,
@@ -368,6 +370,6 @@ pub fn gas_costs(revision: Revision) -> &'static [Option<u16>; 256] {
         Revision::Istanbul => &ISTANBUL_GAS_COSTS,
         Revision::Berlin => &BERLIN_GAS_COSTS,
         Revision::London => &LONDON_GAS_COSTS,
-        Revision::Shanghai => &LONDON_GAS_COSTS,
+        Revision::Shanghai => &SHANGHAI_GAS_COSTS,
     }
 }

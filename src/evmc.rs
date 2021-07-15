@@ -1,4 +1,4 @@
-use crate::{common::*, host::*, tracing::NoopTracer, AnalyzedCode};
+use crate::{common::*, host::*, tracing::*, AnalyzedCode};
 use ::evmc_vm;
 use ::evmc_vm::{ffi::*, EvmcVm, ExecutionContext, ExecutionMessage, MessageFlags, MessageKind};
 use arrayvec::ArrayVec;
@@ -76,7 +76,7 @@ impl From<Message> for ExecutionMessage {
             msg.gas,
             msg.destination.convert(),
             msg.sender.convert(),
-            msg.input_data.is_empty().then(|| &*msg.input_data),
+            (!msg.input_data.is_empty()).then(|| &*msg.input_data),
             msg.value.convert(),
             create2_salt,
         )
@@ -329,17 +329,17 @@ impl EvmcVm for EvmOdin {
         let output = if let Some(context) = context {
             code.execute(
                 context,
-                NoopTracer,
+                &mut NoopTracer,
                 None,
-                Message::from_evmc(&message),
+                Message::from_evmc(message),
                 revision.into(),
             )
         } else {
             code.execute(
                 &mut DummyHost,
-                NoopTracer,
+                &mut NoopTracer,
                 None,
-                Message::from_evmc(&message),
+                Message::from_evmc(message),
                 revision.into(),
             )
         };

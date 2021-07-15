@@ -6,11 +6,9 @@ pub(crate) fn ret(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let offset = *state.stack.get(0);
     let size = *state.stack.get(1);
 
-    if let Some(region) = if let Ok(r) = super::memory::verify_memory_region(state, offset, size) {
-        r
-    } else {
-        return Err(StatusCode::OutOfGas);
-    } {
+    if let Some(region) = super::memory::verify_memory_region(state, offset, size)
+        .map_err(|_| StatusCode::OutOfGas)?
+    {
         state.output_data = state.memory[region.offset..region.offset + region.size.get()]
             .to_vec()
             .into();
@@ -25,7 +23,6 @@ pub(crate) fn op_jump(
 ) -> Result<usize, StatusCode> {
     let dst = state.stack.pop();
     if !jumpdest_map.contains(dst) {
-        println!("{:?}", jumpdest_map);
         return Err(StatusCode::BadJumpDestination);
     }
 

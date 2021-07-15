@@ -42,8 +42,8 @@ pub enum Revision {
 }
 
 impl Revision {
-    pub fn iter() -> impl Iterator<Item = Self> {
-        (&[
+    pub fn iter() -> impl IntoIterator<Item = Self> {
+        [
             Self::Frontier,
             Self::Homestead,
             Self::Tangerine,
@@ -55,9 +55,7 @@ impl Revision {
             Self::Berlin,
             Self::London,
             Self::Shanghai,
-        ])
-            .iter()
-            .copied()
+        ]
     }
 
     pub const fn latest() -> Self {
@@ -150,12 +148,6 @@ pub enum StatusCode {
     /// EVM implementation generic internal error.
     #[strum(serialize = "internal error")]
     InternalError(String),
-}
-
-impl From<anyhow::Error> for StatusCode {
-    fn from(error: anyhow::Error) -> Self {
-        Self::InternalError(error.to_string())
-    }
 }
 
 /// The kind of call-like instruction.
