@@ -220,12 +220,10 @@ pub struct Output {
     pub create_address: Option<Address>,
 }
 
-#[inline]
 pub(crate) fn u256_to_address(v: U256) -> Address {
     H256(v.into()).into()
 }
 
-#[inline]
 pub(crate) fn address_to_u256(v: Address) -> U256 {
     U256::from_big_endian(&v.0)
 }

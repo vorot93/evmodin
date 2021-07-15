@@ -2,7 +2,6 @@ use crate::state::Stack;
 use ethereum_types::U256;
 use i256::{Sign, I256};
 
-#[inline]
 pub(crate) fn byte(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
@@ -22,7 +21,6 @@ pub(crate) fn byte(stack: &mut Stack) {
     stack.push(ret)
 }
 
-#[inline]
 pub(crate) fn shl(stack: &mut Stack) {
     let shift = stack.pop();
     let value = stack.pop();
@@ -36,7 +34,6 @@ pub(crate) fn shl(stack: &mut Stack) {
     stack.push(ret)
 }
 
-#[inline]
 pub(crate) fn shr(stack: &mut Stack) {
     let shift = stack.pop();
     let value = stack.pop();
@@ -50,7 +47,6 @@ pub(crate) fn shr(stack: &mut Stack) {
     stack.push(ret)
 }
 
-#[inline]
 pub(crate) fn sar(stack: &mut Stack) {
     let shift = stack.pop();
     let value = I256::from(stack.pop());

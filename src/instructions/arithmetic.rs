@@ -3,35 +3,30 @@ use core::convert::TryInto;
 use ethereum_types::{U256, U512};
 use i256::I256;
 
-#[inline]
 pub(crate) fn add(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
     stack.push(a.overflowing_add(b).0);
 }
 
-#[inline]
 pub(crate) fn mul(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
     stack.push(a.overflowing_mul(b).0);
 }
 
-#[inline]
 pub(crate) fn sub(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
     stack.push(a.overflowing_sub(b).0);
 }
 
-#[inline]
 pub(crate) fn div(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
     stack.push(if b.is_zero() { U256::zero() } else { a / b });
 }
 
-#[inline]
 pub(crate) fn sdiv(stack: &mut Stack) {
     let a = I256::from(stack.pop());
     let b = I256::from(stack.pop());
@@ -39,7 +34,6 @@ pub(crate) fn sdiv(stack: &mut Stack) {
     stack.push(v.into());
 }
 
-#[inline]
 pub(crate) fn modulo(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
@@ -47,7 +41,6 @@ pub(crate) fn modulo(stack: &mut Stack) {
     stack.push(v);
 }
 
-#[inline]
 pub(crate) fn smod(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
@@ -62,7 +55,6 @@ pub(crate) fn smod(stack: &mut Stack) {
     stack.push(v);
 }
 
-#[inline]
 pub(crate) fn addmod(stack: &mut Stack) {
     let a = U512::from(stack.pop());
     let b = U512::from(stack.pop());
@@ -78,7 +70,6 @@ pub(crate) fn addmod(stack: &mut Stack) {
     stack.push(v);
 }
 
-#[inline]
 pub(crate) fn mulmod(stack: &mut Stack) {
     let a = U512::from(stack.pop());
     let b = U512::from(stack.pop());
@@ -94,7 +85,6 @@ pub(crate) fn mulmod(stack: &mut Stack) {
     stack.push(v);
 }
 
-#[inline]
 fn log2floor(value: U256) -> u64 {
     assert!(value != U256::zero());
     let mut l: u64 = 256;

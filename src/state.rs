@@ -14,7 +14,6 @@ impl Stack {
         SIZE
     }
 
-    #[inline]
     fn get_pos(&self, pos: usize) -> usize {
         self.len() - 1 - pos
     }

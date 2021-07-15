@@ -14,7 +14,6 @@ pub(crate) fn swap<const N: usize>(stack: &mut Stack) {
     stack.swap_top(N);
 }
 
-#[inline]
 pub(crate) fn pop(stack: &mut Stack) {
     stack.pop();
 }

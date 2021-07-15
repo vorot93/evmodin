@@ -10,12 +10,10 @@ const WORD_SIZE: i64 = 32;
 
 /// Returns number of words what would fit to provided number of bytes,
 /// i.e. it rounds up the number bytes to number of words.
-#[inline]
 pub(crate) fn num_words(size_in_bytes: usize) -> i64 {
     ((size_in_bytes as i64) + (WORD_SIZE - 1)) / WORD_SIZE
 }
 
-#[inline]
 pub(crate) fn mload(state: &mut ExecutionState) -> StatusCode {
     let index = state.stack.pop();
 
@@ -36,7 +34,6 @@ pub(crate) fn mload(state: &mut ExecutionState) -> StatusCode {
     StatusCode::Success
 }
 
-#[inline]
 pub(crate) fn mstore(state: &mut ExecutionState) -> StatusCode {
     let index = state.stack.pop();
     let value = state.stack.pop();
@@ -56,7 +53,6 @@ pub(crate) fn mstore(state: &mut ExecutionState) -> StatusCode {
     StatusCode::Success
 }
 
-#[inline]
 pub(crate) fn mstore8(state: &mut ExecutionState) -> StatusCode {
     let index = state.stack.pop();
     let value = state.stack.pop();
@@ -76,12 +72,9 @@ pub(crate) fn mstore8(state: &mut ExecutionState) -> StatusCode {
     StatusCode::Success
 }
 
-#[inline]
 pub(crate) fn msize(state: &mut ExecutionState) {
     state.stack.push(state.memory.len().into());
 }
-
-#[inline]
 
 pub(crate) fn verify_memory_region_u64(
     state: &mut ExecutionState,
@@ -123,7 +116,6 @@ pub(crate) struct MemoryRegion {
     pub size: NonZeroUsize,
 }
 
-#[inline]
 pub(crate) fn verify_memory_region(
     state: &mut ExecutionState,
     offset: U256,
@@ -140,7 +132,6 @@ pub(crate) fn verify_memory_region(
     verify_memory_region_u64(state, offset, NonZeroUsize::new(size.as_usize()).unwrap())
 }
 
-#[inline]
 pub(crate) fn calldatacopy(state: &mut ExecutionState) -> InstructionResolution {
     let mem_index = state.stack.pop();
     let input_index = state.stack.pop();
@@ -177,7 +168,6 @@ pub(crate) fn calldatacopy(state: &mut ExecutionState) -> InstructionResolution 
     InstructionResolution::Continue
 }
 
-#[inline]
 pub(crate) fn keccak256(state: &mut ExecutionState) -> InstructionResolution {
     let index = state.stack.pop();
     let size = state.stack.pop();
@@ -206,12 +196,10 @@ pub(crate) fn keccak256(state: &mut ExecutionState) -> InstructionResolution {
     InstructionResolution::Continue
 }
 
-#[inline]
 pub(crate) fn codesize(stack: &mut Stack, code: &[u8]) {
     stack.push(code.len().into())
 }
 
-#[inline]
 pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> InstructionResolution {
     // TODO: Similar to calldatacopy().
 
@@ -249,7 +237,6 @@ pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> InstructionRe
     InstructionResolution::Continue
 }
 
-#[inline]
 pub(crate) async fn extcodecopy<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -300,12 +287,10 @@ pub(crate) async fn extcodecopy<H: Host>(
     Ok(InstructionResolution::Continue)
 }
 
-#[inline]
 pub(crate) fn returndatasize(state: &mut ExecutionState) {
     state.stack.push(state.return_data.len().into());
 }
 
-#[inline]
 pub(crate) fn returndatacopy(state: &mut ExecutionState) -> InstructionResolution {
     let mem_index = state.stack.pop();
     let input_index = state.stack.pop();
@@ -340,7 +325,6 @@ pub(crate) fn returndatacopy(state: &mut ExecutionState) -> InstructionResolutio
     InstructionResolution::Continue
 }
 
-#[inline]
 pub(crate) async fn extcodehash<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,

@@ -1,7 +1,6 @@
 use super::*;
 use crate::{interpreter::JumpdestMap, StatusCode};
 
-#[inline]
 pub(crate) fn ret(state: &mut ExecutionState, status_code: StatusCode) -> InstructionResolution {
     let offset = *state.stack.get(0);
     let size = *state.stack.get(1);

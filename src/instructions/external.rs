@@ -11,22 +11,18 @@ use crate::{
     state::ExecutionState,
 };
 
-#[inline]
 pub(crate) fn address(state: &mut ExecutionState) {
     state.stack.push(address_to_u256(state.message.destination));
 }
 
-#[inline]
 pub(crate) fn caller(state: &mut ExecutionState) {
     state.stack.push(address_to_u256(state.message.sender));
 }
 
-#[inline]
 pub(crate) fn callvalue(state: &mut ExecutionState) {
     state.stack.push(state.message.value);
 }
 
-#[inline]
 pub(crate) async fn balance<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -47,7 +43,6 @@ pub(crate) async fn balance<H: Host>(
     Ok(InstructionResolution::Continue)
 }
 
-#[inline]
 pub(crate) async fn extcodesize<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -68,7 +63,6 @@ pub(crate) async fn extcodesize<H: Host>(
     Ok(InstructionResolution::Continue)
 }
 
-#[inline]
 pub(crate) async fn gasprice<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -77,7 +71,6 @@ pub(crate) async fn gasprice<H: Host>(
     Ok(())
 }
 
-#[inline]
 pub(crate) async fn origin<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -88,7 +81,6 @@ pub(crate) async fn origin<H: Host>(
     Ok(())
 }
 
-#[inline]
 pub(crate) async fn coinbase<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -99,7 +91,6 @@ pub(crate) async fn coinbase<H: Host>(
     Ok(())
 }
 
-#[inline]
 pub(crate) async fn number<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -110,7 +101,6 @@ pub(crate) async fn number<H: Host>(
     Ok(())
 }
 
-#[inline]
 pub(crate) async fn timestamp<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -121,7 +111,6 @@ pub(crate) async fn timestamp<H: Host>(
     Ok(())
 }
 
-#[inline]
 pub(crate) async fn gaslimit<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -232,7 +221,6 @@ pub(crate) async fn log<H: Host, const N: usize>(
     Ok(InstructionResolution::Continue)
 }
 
-#[inline]
 pub(crate) async fn sload<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
@@ -260,7 +248,6 @@ pub(crate) async fn sload<H: Host>(
     Ok(InstructionResolution::Continue)
 }
 
-#[inline]
 pub(crate) async fn sstore<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
