@@ -66,26 +66,27 @@ impl Revision {
 }
 
 /// Message status code.
-#[derive(Clone, Copy, Debug, Display, PartialEq)]
+#[must_use]
+#[derive(Clone, Debug, Display, PartialEq)]
 pub enum StatusCode {
     /// Execution finished with success.
     #[strum(serialize = "success")]
-    Success = 0,
+    Success,
 
     /// Generic execution failure.
     #[strum(serialize = "failure")]
-    Failure = 1,
+    Failure,
 
     /// Execution terminated with REVERT opcode.
     ///
     /// In this case the amount of gas left MAY be non-zero and additional output
     /// data MAY be provided in ::evmc_result.
     #[strum(serialize = "revert")]
-    Revert = 2,
+    Revert,
 
     /// The execution has run out of gas.
     #[strum(serialize = "out of gas")]
-    OutOfGas = 3,
+    OutOfGas,
 
     /// The designated INVALID instruction has been hit during execution.
     ///
@@ -94,78 +95,63 @@ pub enum StatusCode {
     /// abortion coming from high-level languages. This status code is reported
     /// in case this INVALID instruction has been encountered.
     #[strum(serialize = "invalid instruction")]
-    InvalidInstruction = 4,
+    InvalidInstruction,
 
     /// An undefined instruction has been encountered.
     #[strum(serialize = "undefined instruction")]
-    UndefinedInstruction = 5,
+    UndefinedInstruction,
 
     /// The execution has attempted to put more items on the EVM stack
     /// than the specified limit.
     #[strum(serialize = "stack overflow")]
-    StackOverflow = 6,
+    StackOverflow,
 
     /// Execution of an opcode has required more items on the EVM stack.
     #[strum(serialize = "stack underflow")]
-    StackUnderflow = 7,
+    StackUnderflow,
 
     /// Execution has violated the jump destination restrictions.
     #[strum(serialize = "bad jump destination")]
-    BadJumpDestination = 8,
+    BadJumpDestination,
 
     /// Tried to read outside memory bounds.
     ///
     /// An example is RETURNDATACOPY reading past the available buffer.
     #[strum(serialize = "invalid memory access")]
-    InvalidMemoryAccess = 9,
+    InvalidMemoryAccess,
 
     /// Call depth has exceeded the limit (if any)
     #[strum(serialize = "call depth exceeded")]
-    CallDepthExceeded = 10,
+    CallDepthExceeded,
 
     /// Tried to execute an operation which is restricted in static mode.
     #[strum(serialize = "static mode violation")]
-    StaticModeViolation = 11,
+    StaticModeViolation,
 
     /// A call to a precompiled or system contract has ended with a failure.
     ///
     /// An example: elliptic curve functions handed invalid EC points.
     #[strum(serialize = "precompile failure")]
-    PrecompileFailure = 12,
-
-    /// Contract validation has failed (e.g. due to EVM 1.5 jump validity,
-    /// Casper's purity checker or ewasm contract rules).
-    #[strum(serialize = "contract validation failure")]
-    ContractValidationFailure = 13,
+    PrecompileFailure,
 
     /// An argument to a state accessing method has a value outside of the
     /// accepted range of values.
     #[strum(serialize = "argument out of range")]
-    ArgumentOutOfRange = 14,
+    ArgumentOutOfRange,
 
     /// The caller does not have enough funds for value transfer.
     #[strum(serialize = "insufficient balance")]
-    InsufficientBalance = 17,
+    InsufficientBalance,
 
     /// EVM implementation generic internal error.
     #[strum(serialize = "internal error")]
-    InternalError = -1,
+    InternalError(String),
+}
 
-    /// The execution of the given code and/or message has been rejected
-    /// by the EVM implementation.
-    ///
-    /// This error SHOULD be used to signal that the EVM is not able to or
-    /// willing to execute the given code type or message.
-    /// If an EVM returns the ::EVMC_REJECTED status code,
-    /// the Client MAY try to execute it in other EVM implementation.
-    /// For example, the Client tries running a code in the EVM 1.5. If the
-    /// code is not supported there, the execution falls back to the EVM 1.0.
-    #[strum(serialize = "rejected")]
-    Rejected = -2,
-
-    /// The VM failed to allocate the amount of memory needed for execution.
-    #[strum(serialize = "out of memory")]
-    OutOfMemory = -3,
+impl From<anyhow::Error> for StatusCode {
+    fn from(error: anyhow::Error) -> Self {
+        Self::InternalError(error.to_string())
+    }
 }
 
 /// The kind of call-like instruction.

@@ -15,6 +15,7 @@
 //!     .mstore8_value(4, b'o')
 //!     .ret(0, 5)
 //!     .build();
+//!
 //! let message = Message {
 //!     kind: CallKind::Call,
 //!     is_static: true,
@@ -29,8 +30,7 @@
 //! assert_eq!(
 //!     AnalyzedCode::analyze(my_code)
 //!         .execute(&mut DummyHost, &mut NoopTracer, message, Revision::London)
-//!         .await
-//!         .unwrap(),
+//!         .await,
 //!     Output {
 //!         status_code: StatusCode::Success,
 //!         gas_left: 146,

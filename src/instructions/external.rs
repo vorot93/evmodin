@@ -26,7 +26,7 @@ pub(crate) fn callvalue(state: &mut ExecutionState) {
 pub(crate) async fn balance<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     let address = u256_to_address(state.stack.pop());
 
     if state.evm_revision >= Revision::Berlin
@@ -34,19 +34,19 @@ pub(crate) async fn balance<H: Host>(
     {
         state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
     state.stack.push(host.get_balance(address).await?);
 
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }
 
 pub(crate) async fn extcodesize<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     let address = u256_to_address(state.stack.pop());
 
     if state.evm_revision >= Revision::Berlin
@@ -54,13 +54,13 @@ pub(crate) async fn extcodesize<H: Host>(
     {
         state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
     state.stack.push(host.get_code_size(address).await?);
 
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }
 
 pub(crate) async fn gasprice<H: Host>(
@@ -184,9 +184,9 @@ pub(crate) async fn blockhash<H: Host>(
 pub(crate) async fn log<H: Host, const N: usize>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     if state.message.is_static {
-        return Ok(InstructionResolution::Exit(StatusCode::StaticModeViolation));
+        return Err(StatusCode::StaticModeViolation);
     }
 
     let offset = state.stack.pop();
@@ -195,14 +195,14 @@ pub(crate) async fn log<H: Host, const N: usize>(
     let region = if let Ok(r) = memory::verify_memory_region(state, offset, size) {
         r
     } else {
-        return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+        return Err(StatusCode::OutOfGas);
     };
 
     if let Some(region) = &region {
         let cost = region.size.get() as i64 * 8;
         state.gas_left -= cost;
         if cost < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
@@ -218,13 +218,14 @@ pub(crate) async fn log<H: Host, const N: usize>(
     };
     host.emit_log(state.message.destination, data, &topics)
         .await?;
-    Ok(InstructionResolution::Continue)
+
+    Ok(())
 }
 
 pub(crate) async fn sload<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     let key = H256(state.stack.pop().into());
 
     if state.evm_revision >= Revision::Berlin
@@ -235,7 +236,7 @@ pub(crate) async fn sload<H: Host>(
         const ADDITIONAL_COLD_SLOAD_COST: u16 = COLD_SLOAD_COST - WARM_STORAGE_READ_COST;
         state.gas_left -= i64::from(ADDITIONAL_COLD_SLOAD_COST);
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
@@ -245,19 +246,19 @@ pub(crate) async fn sload<H: Host>(
             .as_bytes(),
     ));
 
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }
 
 pub(crate) async fn sstore<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     if state.message.is_static {
-        return Ok(InstructionResolution::Exit(StatusCode::StaticModeViolation));
+        return Err(StatusCode::StaticModeViolation);
     }
 
     if state.evm_revision >= Revision::Istanbul && state.gas_left <= 2300 {
-        return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+        return Err(StatusCode::OutOfGas);
     }
 
     let key = H256(state.stack.pop().into());
@@ -297,17 +298,17 @@ pub(crate) async fn sstore<H: Host>(
     };
     state.gas_left -= i64::from(cost);
     if state.gas_left < 0 {
-        return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+        return Err(StatusCode::OutOfGas);
     }
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }
 
 pub(crate) async fn selfdestruct<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     if state.message.is_static {
-        return Ok(InstructionResolution::Exit(StatusCode::StaticModeViolation));
+        return Err(StatusCode::StaticModeViolation);
     }
 
     let beneficiary = u256_to_address(state.stack.pop());
@@ -317,7 +318,7 @@ pub(crate) async fn selfdestruct<H: Host>(
     {
         state.gas_left -= i64::from(COLD_ACCOUNT_ACCESS_COST);
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
@@ -330,14 +331,14 @@ pub(crate) async fn selfdestruct<H: Host>(
         if !host.account_exists(beneficiary).await? {
             state.gas_left -= 25000;
             if state.gas_left < 0 {
-                return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+                return Err(StatusCode::OutOfGas);
             }
         }
     }
 
     host.selfdestruct(state.message.destination, beneficiary)
         .await?;
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }
 
 #[cfg(test)]

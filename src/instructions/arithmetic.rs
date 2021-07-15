@@ -104,7 +104,7 @@ fn log2floor(value: U256) -> u64 {
     l
 }
 
-pub(crate) fn exp(state: &mut ExecutionState) -> StatusCode {
+pub(crate) fn exp(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let mut base = state.stack.pop();
     let mut power = state.stack.pop();
 
@@ -118,7 +118,7 @@ pub(crate) fn exp(state: &mut ExecutionState) -> StatusCode {
         state.gas_left -= additional_gas as i64;
 
         if state.gas_left < 0 {
-            return StatusCode::OutOfGas;
+            return Err(StatusCode::OutOfGas);
         }
     }
 
@@ -134,7 +134,7 @@ pub(crate) fn exp(state: &mut ExecutionState) -> StatusCode {
 
     state.stack.push(v);
 
-    StatusCode::Success
+    Ok(())
 }
 
 pub(crate) fn signextend(stack: &mut Stack) {

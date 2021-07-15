@@ -5,36 +5,37 @@ use crate::{
     tracing::Tracer,
     *,
 };
-use ethereum_types::U256;
+use ethereum_types::{Address, U256};
 
 fn check_requirements(
     instruction_table: &InstructionTable,
     state: &mut ExecutionState,
     op: OpCode,
-) -> StatusCode {
+) -> Result<(), StatusCode> {
     let metrics = if let Some(v) = instruction_table[op.to_usize()] {
         v
     } else {
-        return StatusCode::UndefinedInstruction;
+        return Err(StatusCode::UndefinedInstruction);
     };
 
     state.gas_left -= metrics.gas_cost as i64;
     if state.gas_left < 0 {
-        return StatusCode::OutOfGas;
+        return Err(StatusCode::OutOfGas);
     }
 
     let stack_size = state.stack.len();
     if stack_size == Stack::limit() {
         if metrics.can_overflow_stack {
-            return StatusCode::StackOverflow;
+            return Err(StatusCode::StackOverflow);
         }
     } else if stack_size < metrics.stack_height_required.into() {
-        return StatusCode::StackUnderflow;
+        return Err(StatusCode::StackUnderflow);
     }
 
-    StatusCode::Success
+    Ok(())
 }
 
+#[derive(Debug)]
 pub struct JumpdestMap(Vec<bool>);
 
 impl JumpdestMap {
@@ -116,22 +117,34 @@ impl AnalyzedCode {
         tracer: &mut T,
         message: Message,
         revision: Revision,
-    ) -> anyhow::Result<Output> {
+    ) -> Output {
         let state = &mut ExecutionState::new(message, revision);
-        self.execute_with_state(host, tracer, state).await
+        let output = match self.execute_with_state(host, tracer, state).await {
+            Ok(output) => output.into(),
+            Err(status_code) => Output {
+                status_code,
+                gas_left: 0,
+                output_data: Bytes::new(),
+                create_address: None,
+            },
+        };
+
+        tracer.notify_execution_end(&output);
+
+        output
     }
 
-    pub(crate) async fn execute_with_state<H: Host, T: Tracer>(
+    async fn execute_with_state<H: Host, T: Tracer>(
         &self,
         host: &mut H,
         tracer: &mut T,
         state: &mut ExecutionState,
-    ) -> anyhow::Result<Output> {
+    ) -> Result<SuccessfulOutput, StatusCode> {
         tracer.notify_execution_start(state.evm_revision, state.message.clone(), self.code.clone());
 
         let instruction_table = get_baseline_instruction_table(state.evm_revision);
 
-        let mut status;
+        let mut reverted = false;
 
         let mut pc = 0;
 
@@ -143,16 +156,11 @@ impl AnalyzedCode {
                 tracer.notify_instruction_start(pc, op, state);
             }
 
-            status = check_requirements(instruction_table, state, op);
-            if !matches!(status, StatusCode::Success) {
-                break;
-            }
-
-            let mut res = InstructionResolution::Continue;
+            check_requirements(instruction_table, state, op)?;
 
             match op {
                 OpCode::STOP => {
-                    res = InstructionResolution::Exit(StatusCode::Success);
+                    break;
                 }
                 OpCode::ADD => {
                     arithmetic::add(&mut state.stack);
@@ -182,10 +190,7 @@ impl AnalyzedCode {
                     arithmetic::mulmod(&mut state.stack);
                 }
                 OpCode::EXP => {
-                    let status_code = arithmetic::exp(state);
-                    if status_code != StatusCode::Success {
-                        res = InstructionResolution::Exit(status_code);
-                    }
+                    arithmetic::exp(state)?;
                 }
                 OpCode::SIGNEXTEND => {
                     arithmetic::signextend(&mut state.stack);
@@ -234,13 +239,13 @@ impl AnalyzedCode {
                 }
 
                 OpCode::KECCAK256 => {
-                    res = memory::keccak256(state);
+                    memory::keccak256(state)?;
                 }
                 OpCode::ADDRESS => {
                     external::address(state);
                 }
                 OpCode::BALANCE => {
-                    res = external::balance(host, state).await?;
+                    external::balance(host, state).await?;
                 }
                 OpCode::ORIGIN => {
                     external::origin(host, state).await?;
@@ -258,31 +263,31 @@ impl AnalyzedCode {
                     calldatasize(state);
                 }
                 OpCode::CALLDATACOPY => {
-                    res = memory::calldatacopy(state);
+                    memory::calldatacopy(state)?;
                 }
                 OpCode::CODESIZE => {
                     memory::codesize(&mut state.stack, &*self.code);
                 }
                 OpCode::CODECOPY => {
-                    res = memory::codecopy(state, &*self.code);
+                    memory::codecopy(state, &*self.code)?;
                 }
                 OpCode::GASPRICE => {
                     external::gasprice(host, state).await?;
                 }
                 OpCode::EXTCODESIZE => {
-                    res = external::extcodesize(host, state).await?;
+                    external::extcodesize(host, state).await?;
                 }
                 OpCode::EXTCODECOPY => {
-                    res = memory::extcodecopy(host, state).await?;
+                    memory::extcodecopy(host, state).await?;
                 }
                 OpCode::RETURNDATASIZE => {
                     memory::returndatasize(state);
                 }
                 OpCode::RETURNDATACOPY => {
-                    res = memory::returndatacopy(state);
+                    memory::returndatacopy(state)?;
                 }
                 OpCode::EXTCODEHASH => {
-                    res = memory::extcodehash(host, state).await?;
+                    memory::extcodehash(host, state).await?;
                 }
                 OpCode::BLOCKHASH => {
                     external::blockhash(host, state).await?;
@@ -315,43 +320,37 @@ impl AnalyzedCode {
                     stack_manip::pop(&mut state.stack);
                 }
                 OpCode::MLOAD => {
-                    let status_code = memory::mload(state);
-                    if !matches!(status_code, StatusCode::Success) {
-                        res = InstructionResolution::Exit(status_code);
-                    }
+                    memory::mload(state)?;
                 }
                 OpCode::MSTORE => {
-                    let status_code = memory::mstore(state);
-                    if !matches!(status_code, StatusCode::Success) {
-                        res = InstructionResolution::Exit(status_code);
-                    }
+                    memory::mstore(state)?;
                 }
                 OpCode::MSTORE8 => {
-                    let status_code = memory::mstore8(state);
-                    if !matches!(status_code, StatusCode::Success) {
-                        res = InstructionResolution::Exit(status_code);
-                    }
+                    memory::mstore8(state)?;
                 }
-
                 OpCode::JUMP => {
-                    res = op_jump(state, &self.jumpdest_map);
+                    pc = op_jump(state, &self.jumpdest_map)?;
+
+                    continue;
                 }
                 OpCode::JUMPI => {
-                    let v = state.stack.get(1);
-                    if !v.is_zero() {
-                        res = op_jump(state, &self.jumpdest_map);
+                    if !state.stack.get(1).is_zero() {
+                        pc = op_jump(state, &self.jumpdest_map)?;
+                        state.stack.pop();
+
+                        continue;
                     } else {
                         state.stack.pop();
+                        state.stack.pop();
                     }
-                    state.stack.pop();
                 }
                 OpCode::PC => state.stack.push(pc.into()),
                 OpCode::MSIZE => memory::msize(state),
                 OpCode::SLOAD => {
-                    res = external::sload(host, state).await?;
+                    external::sload(host, state).await?;
                 }
                 OpCode::SSTORE => {
-                    res = external::sstore(host, state).await?;
+                    external::sstore(host, state).await?;
                 }
                 OpCode::GAS => state.stack.push(state.gas_left.into()),
                 OpCode::JUMPDEST => {}
@@ -422,59 +421,80 @@ impl AnalyzedCode {
                 OpCode::SWAP15 => swap::<15>(&mut state.stack),
                 OpCode::SWAP16 => swap::<16>(&mut state.stack),
 
-                OpCode::LOG0 => res = external::log::<_, 0>(host, state).await?,
-                OpCode::LOG1 => res = external::log::<_, 1>(host, state).await?,
-                OpCode::LOG2 => res = external::log::<_, 2>(host, state).await?,
-                OpCode::LOG3 => res = external::log::<_, 3>(host, state).await?,
-                OpCode::LOG4 => res = external::log::<_, 4>(host, state).await?,
+                OpCode::LOG0 => external::log::<_, 0>(host, state).await?,
+                OpCode::LOG1 => external::log::<_, 1>(host, state).await?,
+                OpCode::LOG2 => external::log::<_, 2>(host, state).await?,
+                OpCode::LOG3 => external::log::<_, 3>(host, state).await?,
+                OpCode::LOG4 => external::log::<_, 4>(host, state).await?,
 
-                OpCode::CREATE => res = call::create(host, state, false).await?,
-                OpCode::CALL => res = call::call(host, state, CallKind::Call, false).await?,
-                OpCode::CALLCODE => {
-                    res = call::call(host, state, CallKind::CallCode, false).await?
+                OpCode::CREATE => call::create(host, state, false).await?,
+                OpCode::CALL => call::call(host, state, CallKind::Call, false).await?,
+                OpCode::CALLCODE => call::call(host, state, CallKind::CallCode, false).await?,
+                OpCode::RETURN => {
+                    ret(state)?;
+                    break;
                 }
-                OpCode::RETURN => res = ret(state, StatusCode::Success),
                 OpCode::DELEGATECALL => {
-                    res = call::call(host, state, CallKind::DelegateCall, false).await?
+                    call::call(host, state, CallKind::DelegateCall, false).await?
                 }
-                OpCode::STATICCALL => res = call::call(host, state, CallKind::Call, true).await?,
-                OpCode::CREATE2 => res = call::create(host, state, true).await?,
-                OpCode::REVERT => res = ret(state, StatusCode::Revert),
+                OpCode::STATICCALL => call::call(host, state, CallKind::Call, true).await?,
+                OpCode::CREATE2 => call::create(host, state, true).await?,
+                OpCode::REVERT => {
+                    ret(state)?;
+                    reverted = true;
+                    break;
+                }
                 OpCode::INVALID => {
-                    res = InstructionResolution::Exit(StatusCode::InvalidInstruction)
+                    return Err(StatusCode::InvalidInstruction);
                 }
                 OpCode::SELFDESTRUCT => {
-                    res = external::selfdestruct(host, state).await?;
+                    external::selfdestruct(host, state).await?;
+                    break;
                 }
                 other => {
                     unreachable!("reached unhandled opcode: {}", other);
                 }
             }
 
-            match res {
-                InstructionResolution::Continue => pc += 1,
-                InstructionResolution::Exit(code) => {
-                    status = code;
-                    break;
-                }
-                InstructionResolution::Jump(offset) => pc = offset,
-            }
+            pc += 1;
         }
 
-        let gas_left = match status {
-            StatusCode::Success | StatusCode::Revert => state.gas_left,
-            _ => 0,
-        };
-
-        let output = Output {
-            status_code: status,
-            gas_left,
+        let output = SuccessfulOutput {
+            reverted,
+            gas_left: state.gas_left,
             output_data: state.output_data.clone(),
             create_address: None,
         };
 
-        tracer.notify_execution_end(&output);
-
         Ok(output)
+    }
+}
+
+struct SuccessfulOutput {
+    reverted: bool,
+    gas_left: i64,
+    output_data: Bytes,
+    create_address: Option<Address>,
+}
+
+impl From<SuccessfulOutput> for Output {
+    fn from(
+        SuccessfulOutput {
+            reverted,
+            gas_left,
+            output_data,
+            create_address,
+        }: SuccessfulOutput,
+    ) -> Self {
+        Self {
+            status_code: if reverted {
+                StatusCode::Revert
+            } else {
+                StatusCode::Success
+            },
+            gas_left,
+            output_data,
+            create_address,
+        }
     }
 }

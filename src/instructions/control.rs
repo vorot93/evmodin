@@ -1,33 +1,34 @@
 use super::*;
 use crate::{interpreter::JumpdestMap, StatusCode};
 
-pub(crate) fn ret(state: &mut ExecutionState, status_code: StatusCode) -> InstructionResolution {
+pub(crate) fn ret(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let offset = *state.stack.get(0);
     let size = *state.stack.get(1);
 
     if let Some(region) = if let Ok(r) = super::memory::verify_memory_region(state, offset, size) {
         r
     } else {
-        return InstructionResolution::Exit(StatusCode::OutOfGas);
+        return Err(StatusCode::OutOfGas);
     } {
         state.output_data = state.memory[region.offset..region.offset + region.size.get()]
             .to_vec()
             .into();
     }
 
-    InstructionResolution::Exit(status_code)
+    Ok(())
 }
 
 pub(crate) fn op_jump(
     state: &mut ExecutionState,
     jumpdest_map: &JumpdestMap,
-) -> InstructionResolution {
+) -> Result<usize, StatusCode> {
     let dst = state.stack.pop();
     if !jumpdest_map.contains(dst) {
-        return InstructionResolution::Exit(StatusCode::BadJumpDestination);
+        println!("{:?}", jumpdest_map);
+        return Err(StatusCode::BadJumpDestination);
     }
 
-    InstructionResolution::Jump(dst.as_usize())
+    Ok(dst.as_usize())
 }
 
 pub(crate) fn calldataload(state: &mut ExecutionState) {

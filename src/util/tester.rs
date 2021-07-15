@@ -17,7 +17,6 @@ async fn exec(host: &mut MockedHost, revision: Revision, message: Message, code:
     AnalyzedCode::analyze(code)
         .execute(host, &mut StdoutTracer::default(), message, revision)
         .await
-        .unwrap()
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -246,7 +245,7 @@ impl EvmTester {
         let output = exec(&mut host, self.revision, self.message.clone(), self.code).await;
 
         if let Some(status_codes) = self.expected_status_codes {
-            if !status_codes.iter().any(|&s| s == output.status_code) {
+            if !status_codes.iter().any(|s| *s == output.status_code) {
                 panic!(
                     "Status code mismatch: {}, but must be one of {:?}",
                     output.status_code, status_codes

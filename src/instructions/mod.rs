@@ -15,11 +15,4 @@ pub(crate) mod memory;
 pub(crate) mod properties;
 pub(crate) mod stack_manip;
 
-#[must_use]
-pub(crate) enum InstructionResolution {
-    Continue,
-    Exit(StatusCode),
-    Jump(usize),
-}
-
 pub use properties::PROPERTIES;

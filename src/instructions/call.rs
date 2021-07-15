@@ -16,7 +16,7 @@ pub(crate) async fn call<H: Host>(
     state: &mut ExecutionState,
     kind: CallKind,
     is_static: bool,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     let gas = state.stack.pop();
     let dst = u256_to_address(state.stack.pop());
     let value = if is_static || matches!(kind, CallKind::DelegateCall) {
@@ -37,7 +37,7 @@ pub(crate) async fn call<H: Host>(
     {
         state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
@@ -45,14 +45,14 @@ pub(crate) async fn call<H: Host>(
     {
         r
     } else {
-        return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+        return Err(StatusCode::OutOfGas);
     };
 
     let output_region =
         if let Ok(r) = memory::verify_memory_region(state, output_offset, output_size) {
             r
         } else {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         };
 
     let mut msg = Message {
@@ -82,7 +82,7 @@ pub(crate) async fn call<H: Host>(
 
     if matches!(kind, CallKind::Call) {
         if has_value && state.message.is_static {
-            return Ok(InstructionResolution::Exit(StatusCode::StaticModeViolation));
+            return Err(StatusCode::StaticModeViolation);
         }
 
         if (has_value || state.evm_revision < Revision::Spurious)
@@ -93,7 +93,7 @@ pub(crate) async fn call<H: Host>(
     }
     state.gas_left -= cost;
     if state.gas_left < 0 {
-        return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+        return Err(StatusCode::OutOfGas);
     }
 
     if gas < msg.gas.into() {
@@ -104,7 +104,7 @@ pub(crate) async fn call<H: Host>(
         // TODO: Always true for STATICCALL.
         msg.gas = min(msg.gas, state.gas_left - state.gas_left / 64);
     } else if msg.gas > state.gas_left {
-        return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+        return Err(StatusCode::OutOfGas);
     }
 
     if has_value {
@@ -115,11 +115,11 @@ pub(crate) async fn call<H: Host>(
     state.return_data.clear();
 
     if state.message.depth >= 1024 {
-        return Ok(InstructionResolution::Continue);
+        return Ok(());
     }
 
     if has_value && host.get_balance(state.message.destination).await? < value {
-        return Ok(InstructionResolution::Continue);
+        return Ok(());
     }
 
     let result = host.call(&msg).await?;
@@ -140,16 +140,16 @@ pub(crate) async fn call<H: Host>(
 
     let gas_used = msg.gas - result.gas_left;
     state.gas_left -= gas_used;
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }
 
 pub(crate) async fn create<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
     create2: bool,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     if state.message.is_static {
-        return Ok(InstructionResolution::Exit(StatusCode::StaticModeViolation));
+        return Err(StatusCode::StaticModeViolation);
     }
 
     let endowment = state.stack.pop();
@@ -160,7 +160,7 @@ pub(crate) async fn create<H: Host>(
         if let Ok(r) = memory::verify_memory_region(state, init_code_offset, init_code_size) {
             r
         } else {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         };
 
     let call_kind = if create2 {
@@ -170,7 +170,7 @@ pub(crate) async fn create<H: Host>(
             let salt_cost = memory::num_words(region.size.get()) * 6;
             state.gas_left -= salt_cost;
             if state.gas_left < 0 {
-                return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+                return Err(StatusCode::OutOfGas);
             }
         }
 
@@ -185,11 +185,11 @@ pub(crate) async fn create<H: Host>(
     state.return_data.clear();
 
     if state.message.depth >= 1024 {
-        return Ok(InstructionResolution::Continue);
+        return Ok(());
     }
 
     if !endowment.is_zero() && host.get_balance(state.message.destination).await? < endowment {
-        return Ok(InstructionResolution::Continue);
+        return Ok(());
     }
 
     let msg = Message {
@@ -227,5 +227,5 @@ pub(crate) async fn create<H: Host>(
         );
     }
 
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }

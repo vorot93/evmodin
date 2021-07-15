@@ -14,7 +14,7 @@ pub(crate) fn num_words(size_in_bytes: usize) -> i64 {
     ((size_in_bytes as i64) + (WORD_SIZE - 1)) / WORD_SIZE
 }
 
-pub(crate) fn mload(state: &mut ExecutionState) -> StatusCode {
+pub(crate) fn mload(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let index = state.stack.pop();
 
     let region = if let Ok(r) =
@@ -23,7 +23,7 @@ pub(crate) fn mload(state: &mut ExecutionState) -> StatusCode {
     {
         r
     } else {
-        return StatusCode::OutOfGas;
+        return Err(StatusCode::OutOfGas);
     };
 
     let value =
@@ -31,10 +31,10 @@ pub(crate) fn mload(state: &mut ExecutionState) -> StatusCode {
 
     state.stack.push(value);
 
-    StatusCode::Success
+    Ok(())
 }
 
-pub(crate) fn mstore(state: &mut ExecutionState) -> StatusCode {
+pub(crate) fn mstore(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let index = state.stack.pop();
     let value = state.stack.pop();
 
@@ -44,16 +44,17 @@ pub(crate) fn mstore(state: &mut ExecutionState) -> StatusCode {
     {
         r
     } else {
-        return StatusCode::OutOfGas;
+        return Err(StatusCode::OutOfGas);
     };
 
     let mut b = [0; 32];
     value.to_big_endian(&mut b);
     state.memory[region.offset..region.offset + 32].copy_from_slice(&b);
-    StatusCode::Success
+
+    Ok(())
 }
 
-pub(crate) fn mstore8(state: &mut ExecutionState) -> StatusCode {
+pub(crate) fn mstore8(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let index = state.stack.pop();
     let value = state.stack.pop();
 
@@ -63,13 +64,14 @@ pub(crate) fn mstore8(state: &mut ExecutionState) -> StatusCode {
     {
         r
     } else {
-        return StatusCode::OutOfGas;
+        return Err(StatusCode::OutOfGas);
     };
 
     let value = (value.low_u32() & 0xff) as u8;
 
     state.memory[region.offset] = value;
-    StatusCode::Success
+
+    Ok(())
 }
 
 pub(crate) fn msize(state: &mut ExecutionState) {
@@ -132,7 +134,7 @@ pub(crate) fn verify_memory_region(
     verify_memory_region_u64(state, offset, NonZeroUsize::new(size.as_usize()).unwrap())
 }
 
-pub(crate) fn calldatacopy(state: &mut ExecutionState) -> InstructionResolution {
+pub(crate) fn calldatacopy(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let mem_index = state.stack.pop();
     let input_index = state.stack.pop();
     let size = state.stack.pop();
@@ -140,14 +142,14 @@ pub(crate) fn calldatacopy(state: &mut ExecutionState) -> InstructionResolution 
     let region = if let Ok(region) = verify_memory_region(state, mem_index, size) {
         region
     } else {
-        return InstructionResolution::Exit(StatusCode::OutOfGas);
+        return Err(StatusCode::OutOfGas);
     };
 
     if let Some(region) = &region {
         let copy_cost = num_words(region.size.get()) * 3;
         state.gas_left -= copy_cost;
         if state.gas_left < 0 {
-            return InstructionResolution::Exit(StatusCode::OutOfGas);
+            return Err(StatusCode::OutOfGas);
         }
 
         let input_len = state.message.input_data.len().into();
@@ -165,17 +167,17 @@ pub(crate) fn calldatacopy(state: &mut ExecutionState) -> InstructionResolution 
         }
     }
 
-    InstructionResolution::Continue
+    Ok(())
 }
 
-pub(crate) fn keccak256(state: &mut ExecutionState) -> InstructionResolution {
+pub(crate) fn keccak256(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let index = state.stack.pop();
     let size = state.stack.pop();
 
     let region = if let Ok(region) = verify_memory_region(state, index, size) {
         region
     } else {
-        return InstructionResolution::Exit(StatusCode::OutOfGas);
+        return Err(StatusCode::OutOfGas);
     };
 
     state.stack.push(U256::from_big_endian(&*Keccak256::digest(
@@ -184,7 +186,7 @@ pub(crate) fn keccak256(state: &mut ExecutionState) -> InstructionResolution {
             let cost = w * 6;
             state.gas_left -= cost;
             if state.gas_left < 0 {
-                return InstructionResolution::Exit(StatusCode::OutOfGas);
+                return Err(StatusCode::OutOfGas);
             }
 
             &state.memory[region.offset..region.offset + region.size.get()]
@@ -193,14 +195,14 @@ pub(crate) fn keccak256(state: &mut ExecutionState) -> InstructionResolution {
         },
     )));
 
-    InstructionResolution::Continue
+    Ok(())
 }
 
 pub(crate) fn codesize(stack: &mut Stack, code: &[u8]) {
     stack.push(code.len().into())
 }
 
-pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> InstructionResolution {
+pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> Result<(), StatusCode> {
     // TODO: Similar to calldatacopy().
 
     let mem_index = state.stack.pop();
@@ -210,7 +212,7 @@ pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> InstructionRe
     let region = if let Ok(r) = verify_memory_region(state, mem_index, size) {
         r
     } else {
-        return InstructionResolution::Exit(StatusCode::OutOfGas);
+        return Err(StatusCode::OutOfGas);
     };
 
     if let Some(region) = region {
@@ -220,7 +222,7 @@ pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> InstructionRe
         let copy_cost = num_words(region.size.get()) * 3;
         state.gas_left -= copy_cost;
         if state.gas_left < 0 {
-            return InstructionResolution::Exit(StatusCode::OutOfGas);
+            return Err(StatusCode::OutOfGas);
         }
 
         // TODO: Add unit tests for each combination of conditions.
@@ -234,13 +236,13 @@ pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> InstructionRe
         }
     }
 
-    InstructionResolution::Continue
+    Ok(())
 }
 
 pub(crate) async fn extcodecopy<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     let addr = u256_to_address(state.stack.pop());
     let mem_index = state.stack.pop();
     let input_index = state.stack.pop();
@@ -249,14 +251,14 @@ pub(crate) async fn extcodecopy<H: Host>(
     let region = if let Ok(r) = verify_memory_region(state, mem_index, size) {
         r
     } else {
-        return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+        return Err(StatusCode::OutOfGas);
     };
 
     if let Some(region) = &region {
         let copy_cost = num_words(region.size.get()) * 3;
         state.gas_left -= copy_cost;
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
@@ -265,7 +267,7 @@ pub(crate) async fn extcodecopy<H: Host>(
     {
         state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
@@ -284,14 +286,15 @@ pub(crate) async fn extcodecopy<H: Host>(
                 .fill(0);
         }
     }
-    Ok(InstructionResolution::Continue)
+
+    Ok(())
 }
 
 pub(crate) fn returndatasize(state: &mut ExecutionState) {
     state.stack.push(state.return_data.len().into());
 }
 
-pub(crate) fn returndatacopy(state: &mut ExecutionState) -> InstructionResolution {
+pub(crate) fn returndatacopy(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let mem_index = state.stack.pop();
     let input_index = state.stack.pop();
     let size = state.stack.pop();
@@ -299,36 +302,36 @@ pub(crate) fn returndatacopy(state: &mut ExecutionState) -> InstructionResolutio
     let region = if let Ok(r) = verify_memory_region(state, mem_index, size) {
         r
     } else {
-        return InstructionResolution::Exit(StatusCode::OutOfGas);
+        return Err(StatusCode::OutOfGas);
     };
 
     if input_index > U256::from(state.return_data.len()) {
-        return InstructionResolution::Exit(StatusCode::InvalidMemoryAccess);
+        return Err(StatusCode::InvalidMemoryAccess);
     }
     let src = input_index.as_usize();
 
     if src + region.as_ref().map(|r| r.size.get()).unwrap_or(0) > state.return_data.len() {
-        return InstructionResolution::Exit(StatusCode::InvalidMemoryAccess);
+        return Err(StatusCode::InvalidMemoryAccess);
     }
 
     if let Some(region) = region {
         let copy_cost = num_words(region.size.get()) * 3;
         state.gas_left -= copy_cost;
         if state.gas_left < 0 {
-            return InstructionResolution::Exit(StatusCode::OutOfGas);
+            return Err(StatusCode::OutOfGas);
         }
 
         state.memory[region.offset..region.offset + region.size.get()]
             .copy_from_slice(&state.return_data[src..src + region.size.get()]);
     }
 
-    InstructionResolution::Continue
+    Ok(())
 }
 
 pub(crate) async fn extcodehash<H: Host>(
     host: &mut H,
     state: &mut ExecutionState,
-) -> anyhow::Result<InstructionResolution> {
+) -> Result<(), StatusCode> {
     let addr = u256_to_address(state.stack.pop());
 
     if state.evm_revision >= Revision::Berlin
@@ -336,12 +339,12 @@ pub(crate) async fn extcodehash<H: Host>(
     {
         state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
         if state.gas_left < 0 {
-            return Ok(InstructionResolution::Exit(StatusCode::OutOfGas));
+            return Err(StatusCode::OutOfGas);
         }
     }
 
     state
         .stack
         .push(U256::from_big_endian(&host.get_code_hash(addr).await?.0));
-    Ok(InstructionResolution::Continue)
+    Ok(())
 }

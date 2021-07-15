@@ -100,7 +100,7 @@ impl Tracer for StdoutTracer {
 
     fn notify_execution_end(&mut self, output: &Output) {
         let context = self.execution_stack.pop().unwrap();
-        let error = match output.status_code {
+        let error = match &output.status_code {
             StatusCode::Success => None,
             other => Some(other.to_string()),
         };
