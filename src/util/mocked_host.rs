@@ -343,4 +343,12 @@ impl crate::Host for MockedHost {
         value.access_status = AccessStatus::Warm;
         Ok(access_status)
     }
+
+    async fn sub_balance(&mut self, _: Address, _: U256) -> anyhow::Result<bool> {
+        todo!()
+    }
+
+    async fn add_balance(&mut self, _: Address, _: U256) -> anyhow::Result<()> {
+        todo!()
+    }
 }

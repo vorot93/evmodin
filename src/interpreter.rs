@@ -1,6 +1,6 @@
 use self::instruction_table::*;
 use crate::{
-    instructions::{control::*, stack_manip::*, *},
+    instructions::{control::*, stack_manip::*, sudo::burn_gas, *},
     state::*,
     tracing::Tracer,
     *,
@@ -96,9 +96,10 @@ impl AnalyzedCode {
             }
         }
 
-        let mut padded_code = code;
-        padded_code.resize(i + 1, 0);
-        padded_code[i] = OpCode::STOP.to_u8();
+        let mut padded_code = vec![0; i + 2];
+        padded_code[0] = OpCode::EXITSUDO.to_u8();
+        padded_code[1..i + 1].copy_from_slice(&code);
+        padded_code[i + 1] = OpCode::STOP.to_u8();
 
         let jumpdest_map = JumpdestMap(jumpdest_map);
         let code = padded_code.into();
@@ -150,14 +151,17 @@ impl AnalyzedCode {
 
         let mut reverted = false;
 
+        let mut privileged = true;
+
+        let mut pc_offset = 0;
         let mut pc = 0;
 
         loop {
             let op = OpCode(self.code[pc]);
 
             // Do not print stop on the final STOP
-            if !T::DUMMY && pc != self.code.len() - 1 {
-                tracer.notify_instruction_start(pc, op, state);
+            if !T::DUMMY && pc != self.code.len() - 1 && !op.privileged() {
+                tracer.notify_instruction_start(pc - pc_offset, op, state);
             }
 
             check_requirements(instruction_table, state, op)?;
@@ -333,13 +337,13 @@ impl AnalyzedCode {
                     memory::mstore8(state)?;
                 }
                 OpCode::JUMP => {
-                    pc = op_jump(state, &self.jumpdest_map)?;
+                    pc = op_jump(state, &self.jumpdest_map)? + pc_offset;
 
                     continue;
                 }
                 OpCode::JUMPI => {
                     if !state.stack.get(1).is_zero() {
-                        pc = op_jump(state, &self.jumpdest_map)?;
+                        pc = op_jump(state, &self.jumpdest_map)? + pc_offset;
                         state.stack.pop();
 
                         continue;
@@ -348,7 +352,7 @@ impl AnalyzedCode {
                         state.stack.pop();
                     }
                 }
-                OpCode::PC => state.stack.push(pc.into()),
+                OpCode::PC => state.stack.push((pc - pc_offset).into()),
                 OpCode::MSIZE => memory::msize(state),
                 OpCode::SLOAD => {
                     external::sload(host, state).await?;
@@ -455,6 +459,21 @@ impl AnalyzedCode {
                     external::selfdestruct(host, state).await?;
                     break;
                 }
+
+                OpCode::EXITSUDO if privileged => {
+                    privileged = false;
+                    pc_offset = pc + 1;
+                }
+                OpCode::BURN if privileged => {
+                    sudo::burn_gas(state)?;
+                }
+                OpCode::ADDBALANCE if privileged => {
+                    sudo::add_balance(host, state).await?;
+                }
+                OpCode::SUBBALANCE if privileged => {
+                    sudo::sub_balance(host, state).await?;
+                }
+
                 other => {
                     unreachable!("reached unhandled opcode: {}", other);
                 }

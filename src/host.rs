@@ -118,6 +118,11 @@ pub trait Host {
     /// Returns `Ok(AccessStatus::Cold)` if account does not exist.
     async fn access_storage(&mut self, address: Address, key: H256)
         -> anyhow::Result<AccessStatus>;
+
+    /// true if successful, enough balance
+    async fn sub_balance(&mut self, address: Address, amount: U256) -> anyhow::Result<bool>;
+
+    async fn add_balance(&mut self, address: Address, amount: U256) -> anyhow::Result<()>;
 }
 
 /// Host that does not support any ops.
@@ -178,6 +183,14 @@ impl Host for DummyHost {
     }
 
     async fn access_storage(&mut self, _: Address, _: H256) -> anyhow::Result<AccessStatus> {
+        bail!("unsupported")
+    }
+
+    async fn sub_balance(&mut self, _: Address, _: U256) -> anyhow::Result<bool> {
+        bail!("unsupported")
+    }
+
+    async fn add_balance(&mut self, _: Address, _: U256) -> anyhow::Result<()> {
         bail!("unsupported")
     }
 }

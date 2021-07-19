@@ -191,6 +191,11 @@ pub static PROPERTIES: Lazy<[Option<Properties>; 256]> = Lazy::new(|| {
     table[OpCode::INVALID.to_usize()] = Some(Properties::new("INVALID", 0, 0));
     table[OpCode::SELFDESTRUCT.to_usize()] = Some(Properties::new("SELFDESTRUCT", 1, -1));
 
+    table[OpCode::EXITSUDO.to_usize()] = Some(Properties::new("EXITSUDO", 0, 0));
+    table[OpCode::BURN.to_usize()] = Some(Properties::new("BURN", 1, -1));
+    table[OpCode::ADDBALANCE.to_usize()] = Some(Properties::new("ADDBALANCE", 2, -2));
+    table[OpCode::SUBBALANCE.to_usize()] = Some(Properties::new("SUBBALANCE", 2, -2));
+
     table
 });
 
@@ -280,6 +285,11 @@ static FRONTIER_GAS_COSTS: Lazy<[Option<u16>; 256]> = Lazy::new(|| {
     table[OpCode::RETURN.to_usize()] = Some(0);
     table[OpCode::INVALID.to_usize()] = Some(0);
     table[OpCode::SELFDESTRUCT.to_usize()] = Some(0);
+
+    table[OpCode::EXITSUDO.to_usize()] = Some(0);
+    table[OpCode::BURN.to_usize()] = Some(0);
+    table[OpCode::ADDBALANCE.to_usize()] = Some(0);
+    table[OpCode::SUBBALANCE.to_usize()] = Some(0);
 
     table
 });

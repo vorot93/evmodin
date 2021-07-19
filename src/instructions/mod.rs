@@ -14,5 +14,6 @@ pub(crate) mod instruction_table;
 pub(crate) mod memory;
 pub(crate) mod properties;
 pub(crate) mod stack_manip;
+pub(crate) mod sudo;
 
 pub use properties::PROPERTIES;

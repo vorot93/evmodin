@@ -154,6 +154,11 @@ impl OpCode {
     pub const LOG3: OpCode = OpCode(0xa3);
     pub const LOG4: OpCode = OpCode(0xa4);
 
+    pub const EXITSUDO: OpCode = OpCode(0xb0);
+    pub const BURN: OpCode = OpCode(0xb1);
+    pub const ADDBALANCE: OpCode = OpCode(0xb2);
+    pub const SUBBALANCE: OpCode = OpCode(0xb3);
+
     pub const CREATE: OpCode = OpCode(0xf0);
     pub const CALL: OpCode = OpCode(0xf1);
     pub const CALLCODE: OpCode = OpCode(0xf2);
@@ -304,6 +309,10 @@ impl OpCode {
             OpCode::LOG2 => "LOG2",
             OpCode::LOG3 => "LOG3",
             OpCode::LOG4 => "LOG4",
+            OpCode::EXITSUDO => "EXITSUDO",
+            OpCode::BURN => "BURN",
+            OpCode::ADDBALANCE => "ADDBALANCE",
+            OpCode::SUBBALANCE => "SUBBALANCE",
             OpCode::CREATE => "CREATE",
             OpCode::CALL => "CALL",
             OpCode::CALLCODE => "CALLCODE",
@@ -321,6 +330,13 @@ impl OpCode {
     pub fn push_size(self) -> Option<u8> {
         (self.to_u8() >= OpCode::PUSH1.to_u8() && self.to_u8() <= OpCode::PUSH32.to_u8())
             .then(|| self.to_u8() - OpCode::PUSH1.to_u8() + 1)
+    }
+
+    pub const fn privileged(self) -> bool {
+        matches!(
+            self,
+            OpCode::EXITSUDO | OpCode::BURN | OpCode::ADDBALANCE | OpCode::SUBBALANCE
+        )
     }
 }
 
