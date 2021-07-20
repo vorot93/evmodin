@@ -135,7 +135,9 @@ impl AnalyzedCode {
         message: Message,
         revision: Revision,
     ) -> Output {
-        tracer.notify_execution_start(revision, message.clone(), self.code.clone());
+        if !T::DUMMY {
+            tracer.notify_execution_start(revision, message.clone(), self.code.clone());
+        }
 
         let mut c = self.execute_with_state(ExecutionState::new(message, revision), !T::DUMMY);
 
@@ -143,23 +145,21 @@ impl AnalyzedCode {
 
         loop {
             match Pin::new(&mut c).resume_with(resume_data) {
-                GeneratorState::Yielded(interrupt) => match interrupt {
-                    Interrupt::InstructionStart { pc, opcode, state } => {
-                        tracer.notify_instruction_start(pc, opcode, &state);
+                GeneratorState::Yielded(interrupt) => {
+                    resume_data = match interrupt {
+                        Interrupt::InstructionStart { pc, opcode, state } => {
+                            tracer.notify_instruction_start(pc, opcode, &state);
 
-                        resume_data = ResumeData::Dummy;
-                    }
-                    Interrupt::AccessAccount { address } => {
-                        resume_data = ResumeData::AccessAccount {
-                            status: host.access_account(address).await.unwrap(),
-                        };
-                    }
-                    Interrupt::GetBalance { address } => {
-                        resume_data = ResumeData::GetBalance {
-                            balance: host.get_balance(address).await.unwrap(),
+                            ResumeData::Dummy
                         }
-                    }
-                },
+                        Interrupt::AccessAccount { address } => ResumeData::AccessAccount {
+                            status: host.access_account(address).await.unwrap(),
+                        },
+                        Interrupt::GetBalance { address } => ResumeData::GetBalance {
+                            balance: host.get_balance(address).await.unwrap(),
+                        },
+                    };
+                }
                 GeneratorState::Complete(res) => {
                     let output = match res {
                         Ok(output) => output.into(),
@@ -171,7 +171,9 @@ impl AnalyzedCode {
                         },
                     };
 
-                    // tracer.notify_execution_end(&output);
+                    if !T::DUMMY {
+                        tracer.notify_execution_end(&output);
+                    }
 
                     return output;
                 }
