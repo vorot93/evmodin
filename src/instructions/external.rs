@@ -1,15 +1,17 @@
-use ethereum_types::H256;
-
 use super::{
     properties::{COLD_ACCOUNT_ACCESS_COST, WARM_STORAGE_READ_COST},
     *,
 };
 use crate::{
     common::{address_to_u256, u256_to_address},
+    continuation::*,
     host::*,
     instructions::properties::{ADDITIONAL_COLD_ACCOUNT_ACCESS_COST, COLD_SLOAD_COST},
     state::ExecutionState,
 };
+use ethereum_types::{Address, H256};
+use genawaiter::{sync::*, *};
+use std::{future::Future, pin::Pin};
 
 pub(crate) fn address(state: &mut ExecutionState) {
     state.stack.push(address_to_u256(state.message.destination));
@@ -41,6 +43,40 @@ pub(crate) async fn balance<H: Host>(
     state.stack.push(host.get_balance(address).await?);
 
     Ok(())
+}
+
+pub(crate) fn balance_gen(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
+    gen!({
+        let address = u256_to_address(state.stack.pop());
+
+        if state.evm_revision >= Revision::Berlin {
+            let access_status = match yield_!(Interrupt::AccessAccount { address }) {
+                ResumeData::AccessAccount { status } => status,
+                _ => unreachable!(),
+            };
+            if access_status == AccessStatus::Cold {
+                state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
+                if state.gas_left < 0 {
+                    return Err(StatusCode::OutOfGas);
+                }
+            }
+        }
+
+        let balance = match yield_!(Interrupt::GetBalance { address }) {
+            ResumeData::GetBalance { balance } => balance,
+            _ => unreachable!(),
+        };
+
+        state.stack.push(balance);
+
+        Ok(())
+    })
 }
 
 pub(crate) async fn extcodesize<H: Host>(

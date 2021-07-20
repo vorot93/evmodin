@@ -58,7 +58,6 @@ pub struct ExecutionState {
     pub(crate) evm_revision: Revision,
     pub(crate) return_data: Bytes,
     pub(crate) output_data: Bytes,
-    pub(crate) current_block_cost: u32,
 }
 
 impl ExecutionState {
@@ -71,7 +70,6 @@ impl ExecutionState {
             evm_revision,
             return_data: Default::default(),
             output_data: Bytes::new(),
-            current_block_cost: 0,
         }
     }
 }

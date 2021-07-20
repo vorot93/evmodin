@@ -15,7 +15,7 @@ async fn exec(host: &mut MockedHost, revision: Revision, message: Message, code:
         host.access_account(message.destination).await.unwrap();
     }
     AnalyzedCode::analyze(code)
-        .execute(host, &mut StdoutTracer::default(), message, revision)
+        .execute(host, StdoutTracer::default(), message, revision)
         .await
 }
 

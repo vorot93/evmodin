@@ -55,5 +55,6 @@ pub mod opcode;
 mod state;
 pub mod tracing;
 
+mod continuation;
 #[cfg(feature = "util")]
 pub mod util;

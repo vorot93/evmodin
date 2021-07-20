@@ -3,7 +3,7 @@ use crate::state::*;
 use serde::Serialize;
 
 /// Passed into execution context to collect metrics.
-pub trait Tracer {
+pub trait Tracer: Send + Sync {
     #[doc(hidden)]
     const DUMMY: bool = false;
 

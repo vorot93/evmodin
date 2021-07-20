@@ -12,6 +12,7 @@ bytes = { version = "1", default-features = false, features = ["serde"] }
 educe = { version = "0.4", default-features = false, optional = true }
 i256 = { git = "https://github.com/vorot93/rust-i256" }
 ethereum-types = { version = "0.12", default-features = false }
+genawaiter = { git = "https://github.com/cuviper/genawaiter", branch = "unhacked" }
 hex = "0.4"
 hex-literal = { version = "0.3", optional = true }
 num-traits = { version = "0.2", default-features = false }
