@@ -49,7 +49,7 @@ impl Stack {
 pub type Memory = Vec<u8>;
 
 /// Execution state
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ExecutionState {
     pub(crate) gas_left: i64,
     pub(crate) stack: Stack,

@@ -1,4 +1,4 @@
-use std::pin::Pin;
+use std::{cell::RefCell, pin::Pin, sync::Arc};
 
 use self::instruction_table::*;
 use crate::{
@@ -135,13 +135,20 @@ impl AnalyzedCode {
         message: Message,
         revision: Revision,
     ) -> Output {
-        let mut c = self.execute_with_state(tracer, ExecutionState::new(message, revision));
+        tracer.notify_execution_start(revision, message.clone(), self.code.clone());
+
+        let mut c = self.execute_with_state(ExecutionState::new(message, revision), !T::DUMMY);
 
         let mut resume_data = ResumeData::Dummy;
 
         loop {
             match Pin::new(&mut c).resume_with(resume_data) {
                 GeneratorState::Yielded(interrupt) => match interrupt {
+                    Interrupt::InstructionStart { pc, opcode, state } => {
+                        tracer.notify_instruction_start(pc, opcode, &state);
+
+                        resume_data = ResumeData::Dummy;
+                    }
                     Interrupt::AccessAccount { address } => {
                         resume_data = ResumeData::AccessAccount {
                             status: host.access_account(address).await.unwrap(),
@@ -172,10 +179,10 @@ impl AnalyzedCode {
         }
     }
 
-    fn execute_with_state<T: 'static + Tracer>(
+    fn execute_with_state(
         &self,
-        mut tracer: T,
         mut state: ExecutionState,
+        trace: bool,
     ) -> impl Coroutine<
         Yield = Interrupt,
         Resume = ResumeData,
@@ -187,12 +194,6 @@ impl AnalyzedCode {
         Gen::new(|mut co| async move {
             let state = &mut state;
 
-            tracer.notify_execution_start(
-                state.evm_revision,
-                state.message.clone(),
-                s.code.clone(),
-            );
-
             let instruction_table = get_baseline_instruction_table(state.evm_revision);
 
             let mut reverted = false;
@@ -203,8 +204,13 @@ impl AnalyzedCode {
                 let op = OpCode(s.code[pc]);
 
                 // Do not print stop on the final STOP
-                if !T::DUMMY && pc != s.code.len() - 1 {
-                    tracer.notify_instruction_start(pc, op, state);
+                if trace && pc != s.code.len() - 1 {
+                    co.yield_(Interrupt::InstructionStart {
+                        pc,
+                        opcode: op,
+                        state: state.clone(),
+                    })
+                    .await;
                 }
 
                 check_requirements(instruction_table, state, op)?;
