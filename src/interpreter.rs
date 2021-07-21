@@ -1,5 +1,3 @@
-use std::{cell::RefCell, pin::Pin, sync::Arc};
-
 use self::instruction_table::*;
 use crate::{
     continuation::*,
@@ -10,6 +8,7 @@ use crate::{
 };
 use ethereum_types::{Address, U256};
 use genawaiter::{sync::*, *};
+use std::pin::Pin;
 
 fn check_requirements(
     instruction_table: &InstructionTable,
@@ -59,7 +58,7 @@ macro_rules! genexec {
     ($co:expr, $gen:expr) => {
         let mut gen = $gen;
 
-        let mut resume = ResumeData::Dummy;
+        let mut resume = ResumeData::Empty;
 
         while let GeneratorState::Yielded(interrupt) = Pin::new(&mut gen).resume_with(resume) {
             resume = $co.yield_(interrupt).await;
@@ -141,7 +140,7 @@ impl AnalyzedCode {
 
         let mut c = self.execute_with_state(ExecutionState::new(message, revision), !T::DUMMY);
 
-        let mut resume_data = ResumeData::Dummy;
+        let mut resume_data = ResumeData::Empty;
 
         loop {
             match Pin::new(&mut c).resume_with(resume_data) {
@@ -150,13 +149,91 @@ impl AnalyzedCode {
                         Interrupt::InstructionStart { pc, opcode, state } => {
                             tracer.notify_instruction_start(pc, opcode, &state);
 
-                            ResumeData::Dummy
+                            ResumeData::Empty
+                        }
+                        Interrupt::AccountExists { address } => ResumeData::AccountExists {
+                            exists: host.account_exists(address).await.unwrap(),
+                        },
+                        Interrupt::GetBalance { address } => ResumeData::Balance {
+                            balance: host.get_balance(address).await.unwrap(),
+                        },
+                        Interrupt::GetCodeSize { address } => ResumeData::CodeSize {
+                            code_size: host.get_code_size(address).await.unwrap(),
+                        },
+                        Interrupt::GetStorage { address, key } => ResumeData::StorageValue {
+                            value: host.get_storage(address, key).await.unwrap(),
+                        },
+                        Interrupt::SetStorage {
+                            address,
+                            key,
+                            value,
+                        } => {
+                            host.set_storage(address, key, value).await.unwrap();
+                            ResumeData::Empty
+                        }
+                        Interrupt::GetCodeHash { address } => ResumeData::CodeHash {
+                            hash: host.get_code_hash(address).await.unwrap(),
+                        },
+                        Interrupt::CopyCode {
+                            address,
+                            offset,
+                            max_size,
+                        } => ResumeData::Code {
+                            code: {
+                                let mut code = vec![0; max_size];
+                                let copied = host
+                                    .copy_code(address, offset, &mut code[..])
+                                    .await
+                                    .unwrap();
+                                if copied > code.len() {
+                                    return Output {
+                                        status_code: StatusCode::InternalError(format!(
+                                            "copy code: copied {} > max size {}",
+                                            copied,
+                                            code.len()
+                                        )),
+                                        gas_left: 0,
+                                        output_data: Bytes::new(),
+                                        create_address: None,
+                                    };
+                                }
+                                code.truncate(copied);
+                                code.into()
+                            },
+                        },
+                        Interrupt::Selfdestruct {
+                            address,
+                            beneficiary,
+                        } => {
+                            host.selfdestruct(address, beneficiary).await.unwrap();
+
+                            ResumeData::Empty
+                        }
+                        Interrupt::Call { message } => ResumeData::CallOutput {
+                            output: host.call(&message).await.unwrap(),
+                        },
+                        Interrupt::GetTxContext => ResumeData::TxContext {
+                            context: host.get_tx_context().await.unwrap(),
+                        },
+                        Interrupt::GetBlockHash { block_number } => ResumeData::BlockHash {
+                            hash: host.get_block_hash(block_number).await.unwrap(),
+                        },
+                        Interrupt::EmitLog {
+                            address,
+                            data,
+                            topics,
+                        } => {
+                            host.emit_log(address, &*data, topics.as_slice())
+                                .await
+                                .unwrap();
+
+                            ResumeData::Empty
                         }
                         Interrupt::AccessAccount { address } => ResumeData::AccessAccount {
                             status: host.access_account(address).await.unwrap(),
                         },
-                        Interrupt::GetBalance { address } => ResumeData::GetBalance {
-                            balance: host.get_balance(address).await.unwrap(),
+                        Interrupt::AccessStorage { address, key } => ResumeData::AccessStorage {
+                            status: host.access_storage(address, key).await.unwrap(),
                         },
                     };
                 }
@@ -304,11 +381,11 @@ impl AnalyzedCode {
                         external::address(state);
                     }
                     OpCode::BALANCE => {
-                        genexec!(co, external::balance_gen(state));
+                        genexec!(co, external::balance(state));
                     }
-                    // OpCode::ORIGIN => {
-                    //     external::origin(host, state).await?;
-                    // }
+                    OpCode::ORIGIN => {
+                        genexec!(co, external::origin(state));
+                    }
                     OpCode::CALLER => {
                         external::caller(state);
                     }

@@ -10,6 +10,7 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false, features = ["serde"] }
 educe = { version = "0.4", default-features = false, optional = true }
+enum-as-inner = "0.3"
 i256 = { git = "https://github.com/vorot93/rust-i256" }
 ethereum-types = { version = "0.12", default-features = false }
 genawaiter = { git = "https://github.com/cuviper/genawaiter", branch = "unhacked" }
