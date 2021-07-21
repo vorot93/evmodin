@@ -1,5 +1,6 @@
 use super::{properties::*, *};
-use crate::{common::u256_to_address, host::AccessStatus, state::Stack, Host};
+use crate::{common::u256_to_address, continuation::*, host::AccessStatus, state::Stack};
+use genawaiter::{sync::*, *};
 use sha3::{Digest, Keccak256};
 use std::{cmp::min, num::NonZeroUsize};
 
@@ -239,55 +240,63 @@ pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> Result<(), St
     Ok(())
 }
 
-pub(crate) async fn extcodecopy<H: Host>(
-    host: &mut H,
+pub(crate) fn extcodecopy(
     state: &mut ExecutionState,
-) -> Result<(), StatusCode> {
-    let addr = u256_to_address(state.stack.pop());
-    let mem_index = state.stack.pop();
-    let input_index = state.stack.pop();
-    let size = state.stack.pop();
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
+    gen!({
+        let addr = u256_to_address(state.stack.pop());
+        let mem_index = state.stack.pop();
+        let input_index = state.stack.pop();
+        let size = state.stack.pop();
 
-    let region = if let Ok(r) = verify_memory_region(state, mem_index, size) {
-        r
-    } else {
-        return Err(StatusCode::OutOfGas);
-    };
-
-    if let Some(region) = &region {
-        let copy_cost = num_words(region.size.get()) * 3;
-        state.gas_left -= copy_cost;
-        if state.gas_left < 0 {
+        let region = if let Ok(r) = verify_memory_region(state, mem_index, size) {
+            r
+        } else {
             return Err(StatusCode::OutOfGas);
+        };
+
+        if let Some(region) = &region {
+            let copy_cost = num_words(region.size.get()) * 3;
+            state.gas_left -= copy_cost;
+            if state.gas_left < 0 {
+                return Err(StatusCode::OutOfGas);
+            }
         }
-    }
 
-    if state.evm_revision >= Revision::Berlin
-        && host.access_account(addr).await? == AccessStatus::Cold
-    {
-        state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
-        if state.gas_left < 0 {
-            return Err(StatusCode::OutOfGas);
+        if state.evm_revision >= Revision::Berlin
+            && ResumeData::into_access_account(yield_!(Interrupt::AccessAccount { address: addr }))
+                .unwrap()
+                == AccessStatus::Cold
+        {
+            state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
+            if state.gas_left < 0 {
+                return Err(StatusCode::OutOfGas);
+            }
         }
-    }
 
-    if let Some(region) = region {
-        let src = min(U256::from(MAX_BUFFER_SIZE), input_index).as_usize();
+        if let Some(region) = region {
+            let src = min(U256::from(MAX_BUFFER_SIZE), input_index).as_usize();
 
-        let num_bytes_copied = host
-            .copy_code(
-                addr,
-                src,
-                &mut state.memory[region.offset..region.offset + region.size.get()],
-            )
-            .await?;
-        if region.size.get() - num_bytes_copied > 0 {
-            state.memory[region.offset + num_bytes_copied..region.offset + region.size.get()]
-                .fill(0);
+            let r = &mut state.memory[region.offset..region.offset + region.size.get()];
+            let code = ResumeData::into_code(yield_!(Interrupt::CopyCode {
+                address: addr,
+                offset: src,
+                max_size: r.len(),
+            }))
+            .unwrap();
+
+            r[..code.len()].copy_from_slice(&code);
+            if region.size.get() - code.len() > 0 {
+                state.memory[region.offset + code.len()..region.offset + region.size.get()].fill(0);
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 pub(crate) fn returndatasize(state: &mut ExecutionState) {
@@ -328,23 +337,32 @@ pub(crate) fn returndatacopy(state: &mut ExecutionState) -> Result<(), StatusCod
     Ok(())
 }
 
-pub(crate) async fn extcodehash<H: Host>(
-    host: &mut H,
+pub(crate) fn extcodehash(
     state: &mut ExecutionState,
-) -> Result<(), StatusCode> {
-    let addr = u256_to_address(state.stack.pop());
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
+    gen!({
+        let addr = u256_to_address(state.stack.pop());
 
-    if state.evm_revision >= Revision::Berlin
-        && host.access_account(addr).await? == AccessStatus::Cold
-    {
-        state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
-        if state.gas_left < 0 {
-            return Err(StatusCode::OutOfGas);
+        if state.evm_revision >= Revision::Berlin
+            && ResumeData::into_access_account(yield_!(Interrupt::AccessAccount { address: addr }))
+                .unwrap()
+                == AccessStatus::Cold
+        {
+            state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
+            if state.gas_left < 0 {
+                return Err(StatusCode::OutOfGas);
+            }
         }
-    }
 
-    state
-        .stack
-        .push(U256::from_big_endian(&host.get_code_hash(addr).await?.0));
-    Ok(())
+        state.stack.push(U256::from_big_endian(
+            ResumeData::into_code_hash(yield_!(Interrupt::GetCodeHash { address: addr }))
+                .unwrap()
+                .as_bytes(),
+        ));
+        Ok(())
+    })
 }

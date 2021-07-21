@@ -55,15 +55,18 @@ pub struct AnalyzedCode {
 }
 
 macro_rules! genexec {
-    ($co:expr, $gen:expr) => {
+    ($co:expr, $gen:expr) => {{
         let mut gen = $gen;
 
         let mut resume = ResumeData::Empty;
 
-        while let GeneratorState::Yielded(interrupt) = Pin::new(&mut gen).resume_with(resume) {
-            resume = $co.yield_(interrupt).await;
+        loop {
+            match Pin::new(&mut gen).resume_with(resume) {
+                GeneratorState::Yielded(interrupt) => resume = $co.yield_(interrupt).await,
+                GeneratorState::Complete(out) => break out,
+            }
         }
-    };
+    }};
 }
 
 impl AnalyzedCode {
@@ -167,10 +170,9 @@ impl AnalyzedCode {
                             address,
                             key,
                             value,
-                        } => {
-                            host.set_storage(address, key, value).await.unwrap();
-                            ResumeData::Empty
-                        }
+                        } => ResumeData::StorageStatus {
+                            status: host.set_storage(address, key, value).await.unwrap(),
+                        },
                         Interrupt::GetCodeHash { address } => ResumeData::CodeHash {
                             hash: host.get_code_hash(address).await.unwrap(),
                         },
@@ -381,7 +383,7 @@ impl AnalyzedCode {
                         external::address(state);
                     }
                     OpCode::BALANCE => {
-                        genexec!(co, external::balance(state));
+                        genexec!(co, external::balance(state))?;
                     }
                     OpCode::ORIGIN => {
                         genexec!(co, external::origin(state));
@@ -407,51 +409,51 @@ impl AnalyzedCode {
                     OpCode::CODECOPY => {
                         memory::codecopy(state, &*s.code)?;
                     }
-                    // OpCode::GASPRICE => {
-                    //     external::gasprice(host, state).await?;
-                    // }
-                    // OpCode::EXTCODESIZE => {
-                    //     external::extcodesize(host, state).await?;
-                    // }
-                    // OpCode::EXTCODECOPY => {
-                    //     memory::extcodecopy(host, state).await?;
-                    // }
+                    OpCode::GASPRICE => {
+                        genexec!(co, external::gasprice(state));
+                    }
+                    OpCode::EXTCODESIZE => {
+                        genexec!(co, external::extcodesize(state))?;
+                    }
+                    OpCode::EXTCODECOPY => {
+                        genexec!(co, memory::extcodecopy(state))?;
+                    }
                     OpCode::RETURNDATASIZE => {
                         memory::returndatasize(state);
                     }
                     OpCode::RETURNDATACOPY => {
                         memory::returndatacopy(state)?;
                     }
-                    // OpCode::EXTCODEHASH => {
-                    //     memory::extcodehash(host, state).await?;
-                    // }
-                    // OpCode::BLOCKHASH => {
-                    //     external::blockhash(host, state).await?;
-                    // }
-                    // OpCode::COINBASE => {
-                    //     external::coinbase(host, state).await?;
-                    // }
-                    // OpCode::TIMESTAMP => {
-                    //     external::timestamp(host, state).await?;
-                    // }
-                    // OpCode::NUMBER => {
-                    //     external::number(host, state).await?;
-                    // }
-                    // OpCode::DIFFICULTY => {
-                    //     external::difficulty(host, state).await?;
-                    // }
-                    // OpCode::GASLIMIT => {
-                    //     external::gaslimit(host, state).await?;
-                    // }
-                    // OpCode::CHAINID => {
-                    //     external::chainid(host, state).await?;
-                    // }
-                    // OpCode::SELFBALANCE => {
-                    //     external::selfbalance(host, state).await?;
-                    // }
-                    // OpCode::BASEFEE => {
-                    //     external::basefee(host, state).await?;
-                    // }
+                    OpCode::EXTCODEHASH => {
+                        genexec!(co, memory::extcodehash(state))?;
+                    }
+                    OpCode::BLOCKHASH => {
+                        genexec!(co, external::blockhash(state));
+                    }
+                    OpCode::COINBASE => {
+                        genexec!(co, external::coinbase(state));
+                    }
+                    OpCode::TIMESTAMP => {
+                        genexec!(co, external::timestamp(state));
+                    }
+                    OpCode::NUMBER => {
+                        genexec!(co, external::number(state));
+                    }
+                    OpCode::DIFFICULTY => {
+                        genexec!(co, external::difficulty(state));
+                    }
+                    OpCode::GASLIMIT => {
+                        genexec!(co, external::gaslimit(state));
+                    }
+                    OpCode::CHAINID => {
+                        genexec!(co, external::chainid(state));
+                    }
+                    OpCode::SELFBALANCE => {
+                        genexec!(co, external::selfbalance(state));
+                    }
+                    OpCode::BASEFEE => {
+                        genexec!(co, external::basefee(state));
+                    }
                     OpCode::POP => {
                         stack_manip::pop(&mut state.stack);
                     }
@@ -482,12 +484,12 @@ impl AnalyzedCode {
                     }
                     OpCode::PC => state.stack.push(pc.into()),
                     OpCode::MSIZE => memory::msize(state),
-                    // OpCode::SLOAD => {
-                    //     external::sload(host, state).await?;
-                    // }
-                    // OpCode::SSTORE => {
-                    //     external::sstore(host, state).await?;
-                    // }
+                    OpCode::SLOAD => {
+                        genexec!(co, external::sload(state))?;
+                    }
+                    OpCode::SSTORE => {
+                        genexec!(co, external::sstore(state))?;
+                    }
                     OpCode::GAS => state.stack.push(state.gas_left.into()),
                     OpCode::JUMPDEST => {}
                     OpCode::PUSH1 => pc += load_push::<1>(&mut state.stack, &s.code[pc + 1..]),
@@ -557,24 +559,34 @@ impl AnalyzedCode {
                     OpCode::SWAP15 => swap::<15>(&mut state.stack),
                     OpCode::SWAP16 => swap::<16>(&mut state.stack),
 
-                    // OpCode::LOG0 => external::log::<_, 0>(host, state).await?,
-                    // OpCode::LOG1 => external::log::<_, 1>(host, state).await?,
-                    // OpCode::LOG2 => external::log::<_, 2>(host, state).await?,
-                    // OpCode::LOG3 => external::log::<_, 3>(host, state).await?,
-                    // OpCode::LOG4 => external::log::<_, 4>(host, state).await?,
+                    OpCode::LOG0 => {
+                        genexec!(co, external::log(state, 0))?;
+                    }
+                    OpCode::LOG1 => {
+                        genexec!(co, external::log(state, 1))?;
+                    }
+                    OpCode::LOG2 => {
+                        genexec!(co, external::log(state, 2))?;
+                    }
+                    OpCode::LOG3 => {
+                        genexec!(co, external::log(state, 3))?;
+                    }
+                    OpCode::LOG4 => {
+                        genexec!(co, external::log(state, 4))?;
+                    }
 
-                    // OpCode::CREATE => call::create(host, state, false).await?,
-                    // OpCode::CALL => call::call(host, state, CallKind::Call, false).await?,
-                    // OpCode::CALLCODE => call::call(host, state, CallKind::CallCode, false).await?,
+                    OpCode::CREATE => genexec!(co, call::create(state, false))?,
+                    OpCode::CALL => genexec!(co, call::call(state, CallKind::Call, false))?,
+                    OpCode::CALLCODE => genexec!(co, call::call(state, CallKind::CallCode, false))?,
                     OpCode::RETURN => {
                         ret(state)?;
                         break;
                     }
-                    // OpCode::DELEGATECALL => {
-                    //     call::call(host, state, CallKind::DelegateCall, false).await?
-                    // }
-                    // OpCode::STATICCALL => call::call(host, state, CallKind::Call, true).await?,
-                    // OpCode::CREATE2 => call::create(host, state, true).await?,
+                    OpCode::DELEGATECALL => {
+                        genexec!(co, call::call(state, CallKind::DelegateCall, false))?
+                    }
+                    OpCode::STATICCALL => genexec!(co, call::call(state, CallKind::Call, true))?,
+                    OpCode::CREATE2 => genexec!(co, call::create(state, true))?,
                     OpCode::REVERT => {
                         ret(state)?;
                         reverted = true;
@@ -583,10 +595,10 @@ impl AnalyzedCode {
                     OpCode::INVALID => {
                         return Err(StatusCode::InvalidInstruction);
                     }
-                    // OpCode::SELFDESTRUCT => {
-                    //     external::selfdestruct(host, state).await?;
-                    //     break;
-                    // }
+                    OpCode::SELFDESTRUCT => {
+                        genexec!(co, external::selfdestruct(state))?;
+                        break;
+                    }
                     other => {
                         unreachable!("reached unhandled opcode: {}", other);
                     }

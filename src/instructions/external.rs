@@ -55,9 +55,13 @@ pub(crate) fn balance(
     })
 }
 
-pub(crate) fn extcodesize<H: Host>(
+pub(crate) fn extcodesize(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
     gen!({
         let address = u256_to_address(state.stack.pop());
 
@@ -81,7 +85,10 @@ pub(crate) fn extcodesize<H: Host>(
     })
 }
 
-pub(crate) fn gasprice(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+pub(crate) fn gasprice(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -102,38 +109,41 @@ pub(crate) fn origin(
 
 pub(crate) fn coinbase(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
         state.stack.push(address_to_u256(tx_context.block_coinbase));
-        Ok(())
     })
 }
 
 pub(crate) fn number(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
         state.stack.push(tx_context.block_number.into());
-        Ok(())
     })
 }
 
 pub(crate) fn timestamp(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
         state.stack.push(tx_context.block_timestamp.into());
-        Ok(())
     })
 }
 
-pub(crate) fn gaslimit(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+pub(crate) fn gaslimit(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -141,7 +151,10 @@ pub(crate) fn gaslimit(state: &mut ExecutionState) -> impl Coroutine + Send + Sy
     })
 }
 
-pub(crate) fn difficulty(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+pub(crate) fn difficulty(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -149,7 +162,10 @@ pub(crate) fn difficulty(state: &mut ExecutionState) -> impl Coroutine + Send + 
     })
 }
 
-pub(crate) fn chainid(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+pub(crate) fn chainid(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -157,7 +173,10 @@ pub(crate) fn chainid(state: &mut ExecutionState) -> impl Coroutine + Send + Syn
     })
 }
 
-pub(crate) fn basefee(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+pub(crate) fn basefee(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -165,7 +184,10 @@ pub(crate) fn basefee(state: &mut ExecutionState) -> impl Coroutine + Send + Syn
     })
 }
 
-pub(crate) fn selfbalance(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+pub(crate) fn selfbalance(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let balance = ResumeData::into_balance(yield_!(Interrupt::GetBalance {
             address: state.message.destination
@@ -176,7 +198,10 @@ pub(crate) fn selfbalance(state: &mut ExecutionState) -> impl Coroutine + Send +
     })
 }
 
-pub(crate) fn blockhash(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+pub(crate) fn blockhash(
+    state: &mut ExecutionState,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let number = state.stack.pop();
 
@@ -200,9 +225,14 @@ pub(crate) fn blockhash(state: &mut ExecutionState) -> impl Coroutine + Send + S
     })
 }
 
-pub(crate) fn log<const N: usize>(
+pub(crate) fn log(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
+    num_topics: usize,
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
     gen!({
         if state.message.is_static {
             return Err(StatusCode::StaticModeViolation);
@@ -226,7 +256,7 @@ pub(crate) fn log<const N: usize>(
         }
 
         let mut topics = ArrayVec::new();
-        for _ in 0..N {
+        for _ in 0..num_topics {
             topics.push(H256(state.stack.pop().into()));
         }
 
@@ -249,7 +279,11 @@ pub(crate) fn log<const N: usize>(
 
 pub(crate) fn sload(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
     gen!({
         let key = H256(state.stack.pop().into());
 
@@ -285,8 +319,12 @@ pub(crate) fn sload(
 
 pub(crate) fn sstore(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
-    Gen::new(|mut co| async move {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
+    gen!({
         if state.message.is_static {
             return Err(StatusCode::StaticModeViolation);
         }
@@ -300,28 +338,23 @@ pub(crate) fn sstore(
 
         let mut cost = 0;
         if state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeData::into_access_storage(
-                co.yield_(Interrupt::AccessStorage {
+            let access_status =
+                ResumeData::into_access_storage(yield_!(Interrupt::AccessStorage {
                     address: state.message.destination,
                     key,
-                })
-                .await,
-            )
-            .unwrap();
+                }))
+                .unwrap();
 
             if access_status == AccessStatus::Cold {
                 cost = COLD_SLOAD_COST;
             }
         }
 
-        let status = ResumeData::into_storage_status(
-            co.yield_(Interrupt::SetStorage {
-                address: state.message.destination,
-                key,
-                value,
-            })
-            .await,
-        )
+        let status = ResumeData::into_storage_status(yield_!(Interrupt::SetStorage {
+            address: state.message.destination,
+            key,
+            value,
+        }))
         .unwrap();
 
         cost = match status {
@@ -355,7 +388,11 @@ pub(crate) fn sstore(
 
 pub(crate) fn selfdestruct(
     state: &mut ExecutionState,
-) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
+       + Send
+       + Sync
+       + Unpin
+       + '_ {
     Gen::new(|mut co| async move {
         if state.message.is_static {
             return Err(StatusCode::StaticModeViolation);
