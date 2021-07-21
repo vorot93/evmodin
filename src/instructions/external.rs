@@ -55,7 +55,7 @@ pub(crate) fn balance(
     })
 }
 
-pub(crate) async fn extcodesize<H: Host>(
+pub(crate) fn extcodesize<H: Host>(
     state: &mut ExecutionState,
 ) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
     gen!({
@@ -81,36 +81,28 @@ pub(crate) async fn extcodesize<H: Host>(
     })
 }
 
-pub(crate) async fn gasprice<H: Host>(
-    host: &mut H,
-    state: &mut ExecutionState,
-) -> anyhow::Result<()> {
-    state.stack.push(host.get_tx_context().await?.tx_gas_price);
-    Ok(())
+pub(crate) fn gasprice(state: &mut ExecutionState) -> impl Coroutine + Send + Sync + Unpin + '_ {
+    gen!({
+        let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
+
+        state.stack.push(tx_context.tx_gas_price);
+    })
 }
 
 pub(crate) fn origin(
     state: &mut ExecutionState,
-) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
-       + Send
-       + Sync
-       + Unpin
-       + '_ {
+) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = ()> + Send + Sync + Unpin + '_
+{
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
         state.stack.push(address_to_u256(tx_context.tx_origin));
-        Ok(())
     })
 }
 
 pub(crate) fn coinbase(
     state: &mut ExecutionState,
-) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
-       + Send
-       + Sync
-       + Unpin
-       + '_ {
+) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -121,11 +113,7 @@ pub(crate) fn coinbase(
 
 pub(crate) fn number(
     state: &mut ExecutionState,
-) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
-       + Send
-       + Sync
-       + Unpin
-       + '_ {
+) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -136,11 +124,7 @@ pub(crate) fn number(
 
 pub(crate) fn timestamp(
     state: &mut ExecutionState,
-) -> impl Coroutine<Yield = Interrupt, Resume = ResumeData, Return = Result<(), StatusCode>>
-       + Send
-       + Sync
-       + Unpin
-       + '_ {
+) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
     gen!({
         let tx_context = ResumeData::into_tx_context(yield_!(Interrupt::GetTxContext)).unwrap();
 
@@ -219,7 +203,7 @@ pub(crate) fn blockhash(state: &mut ExecutionState) -> impl Coroutine + Send + S
 pub(crate) fn log<const N: usize>(
     state: &mut ExecutionState,
 ) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
-    Gen::new(|mut co| async move {
+    gen!({
         if state.message.is_static {
             return Err(StatusCode::StaticModeViolation);
         }
@@ -251,15 +235,13 @@ pub(crate) fn log<const N: usize>(
         } else {
             &[]
         };
-        assert!(matches!(
-            co.yield_(Interrupt::EmitLog {
-                address: state.message.destination,
-                data: data.to_vec().into(),
-                topics,
-            })
-            .await,
-            ResumeData::Empty
-        ));
+        let r = yield_!(Interrupt::EmitLog {
+            address: state.message.destination,
+            data: data.to_vec().into(),
+            topics,
+        });
+
+        assert!(matches!(r, ResumeData::Empty));
 
         Ok(())
     })
@@ -268,18 +250,16 @@ pub(crate) fn log<const N: usize>(
 pub(crate) fn sload(
     state: &mut ExecutionState,
 ) -> impl Coroutine<Return = Result<(), StatusCode>> + Send + Sync + Unpin + '_ {
-    Gen::new(|mut co| async move {
+    gen!({
         let key = H256(state.stack.pop().into());
 
         if state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeData::into_access_storage(
-                co.yield_(Interrupt::AccessStorage {
+            let access_status =
+                ResumeData::into_access_storage(yield_!(Interrupt::AccessStorage {
                     address: state.message.destination,
                     key,
-                })
-                .await,
-            )
-            .unwrap();
+                }))
+                .unwrap();
             if access_status == AccessStatus::Cold {
                 // The warm storage access cost is already applied (from the cost table).
                 // Here we need to apply additional cold storage access cost.
@@ -291,13 +271,10 @@ pub(crate) fn sload(
             }
         }
 
-        let storage = ResumeData::into_storage_value(
-            co.yield_(Interrupt::GetStorage {
-                address: state.message.destination,
-                key,
-            })
-            .await,
-        )
+        let storage = ResumeData::into_storage_value(yield_!(Interrupt::GetStorage {
+            address: state.message.destination,
+            key,
+        }))
         .unwrap();
 
         state.stack.push(U256::from_big_endian(storage.as_bytes()));
