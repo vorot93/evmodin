@@ -2,7 +2,6 @@
 //!
 //! # Usage
 //! ```
-//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use evmodin::{*, host::*, util::*, tracing::*};
 //! use ethereum_types::*;
 //! use hex_literal::hex;
@@ -37,7 +36,6 @@
 //!         create_address: None,
 //!     }
 //! )
-//! # })
 //! ```
 use bytes::Bytes;
 pub use common::{CallKind, Message, Output, Revision, StatusCode};
@@ -57,3 +55,6 @@ pub mod tracing;
 mod continuation;
 #[cfg(feature = "util")]
 pub mod util;
+
+#[cfg(feature = "evmc")]
+pub mod evmc;

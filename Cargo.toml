@@ -10,6 +10,7 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bytes = { version = "1", default-features = false, features = ["serde"] }
 educe = { version = "0.4", default-features = false, optional = true }
 enum-as-inner = "0.3"
+evmc-vm = { git = "https://github.com/ethereum/evmc", optional = true }
 i256 = { git = "https://github.com/vorot93/rust-i256" }
 ethereum-types = { version = "0.12", default-features = false }
 genawaiter = { git = "https://github.com/cuviper/genawaiter", branch = "unhacked" }
@@ -30,7 +31,7 @@ strum_macros = "0.21"
 evmodin-test = { path = ".", package = "evmodin", features = ["util"] }
 hex-literal = "0.3"
 rand = { version = "0.8", features = ["std"] }
-tokio = { version = "1", features = ["full"] }
 
 [features]
+evmc = ["evmc-vm"]
 util = ["educe/Debug", "hex-literal", "parking_lot"]

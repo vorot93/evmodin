@@ -105,39 +105,39 @@ pub trait Host {
 pub struct DummyHost;
 
 impl Host for DummyHost {
-    fn account_exists(&self, address: Address) -> bool {
+    fn account_exists(&self, _: Address) -> bool {
         todo!()
     }
 
-    fn get_storage(&self, address: Address, key: H256) -> H256 {
+    fn get_storage(&self, _: Address, _: H256) -> H256 {
         todo!()
     }
 
-    fn set_storage(&mut self, address: Address, key: H256, value: H256) -> StorageStatus {
+    fn set_storage(&mut self, _: Address, _: H256, _: H256) -> StorageStatus {
         todo!()
     }
 
-    fn get_balance(&self, address: Address) -> U256 {
+    fn get_balance(&self, _: Address) -> U256 {
         todo!()
     }
 
-    fn get_code_size(&self, address: Address) -> U256 {
+    fn get_code_size(&self, _: Address) -> U256 {
         todo!()
     }
 
-    fn get_code_hash(&self, address: Address) -> H256 {
+    fn get_code_hash(&self, _: Address) -> H256 {
         todo!()
     }
 
-    fn copy_code(&self, address: Address, offset: usize, buffer: &mut [u8]) -> usize {
+    fn copy_code(&self, _: Address, _: usize, _: &mut [u8]) -> usize {
         todo!()
     }
 
-    fn selfdestruct(&mut self, address: Address, beneficiary: Address) {
+    fn selfdestruct(&mut self, _: Address, _: Address) {
         todo!()
     }
 
-    fn call(&mut self, msg: &Message) -> Output {
+    fn call(&mut self, _: &Message) -> Output {
         todo!()
     }
 
@@ -145,19 +145,19 @@ impl Host for DummyHost {
         todo!()
     }
 
-    fn get_block_hash(&self, block_number: u64) -> H256 {
+    fn get_block_hash(&self, _: u64) -> H256 {
         todo!()
     }
 
-    fn emit_log(&mut self, address: Address, data: &[u8], topics: &[H256]) {
+    fn emit_log(&mut self, _: Address, _: &[u8], _: &[H256]) {
         todo!()
     }
 
-    fn access_account(&mut self, address: Address) -> AccessStatus {
+    fn access_account(&mut self, _: Address) -> AccessStatus {
         todo!()
     }
 
-    fn access_storage(&mut self, address: Address, key: H256) -> AccessStatus {
+    fn access_storage(&mut self, _: Address, _: H256) -> AccessStatus {
         todo!()
     }
 }

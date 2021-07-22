@@ -6,9 +6,9 @@ use crate::{
 use bytes::Bytes;
 use educe::Educe;
 use ethereum_types::{Address, U256};
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::sync::Arc;
 
-async fn exec(host: &mut MockedHost, revision: Revision, message: Message, code: Bytes) -> Output {
+fn exec(host: &mut MockedHost, revision: Revision, message: Message, code: Bytes) -> Output {
     // Add EIP-2929 tweak.
     if revision >= Revision::Berlin {
         host.access_account(message.sender);
@@ -23,18 +23,6 @@ enum GasCheck {
     Left(i64),
 }
 
-#[allow(clippy::type_complexity)]
-#[derive(Clone)]
-enum ApplyHostFn {
-    Sync(Arc<dyn Fn(&mut MockedHost, &Message) + 'static>),
-    Async(
-        Arc<
-            dyn Fn(MockedHost, Message) -> Pin<Box<dyn Future<Output = (MockedHost, Message)>>>
-                + 'static,
-        >,
-    ),
-}
-
 /// Tester that executes EVM bytecode with `MockedHost` context and runs set checks.
 #[derive(Clone, Educe)]
 #[educe(Debug)]
@@ -42,7 +30,7 @@ enum ApplyHostFn {
 pub struct EvmTester {
     host: MockedHost,
     #[educe(Debug(ignore))]
-    apply_host_fns: Vec<ApplyHostFn>,
+    apply_host_fns: Vec<Arc<dyn Fn(&mut MockedHost, &Message) + 'static>>,
     #[educe(Debug(ignore))]
     inspect_output_fn: Arc<dyn Fn(&[u8]) + 'static>,
     #[educe(Debug(ignore))]
@@ -98,25 +86,7 @@ impl EvmTester {
 
     /// Queue function that will modify the host before execution.
     pub fn apply_host_fn(mut self, host_fn: impl Fn(&mut MockedHost, &Message) + 'static) -> Self {
-        self.apply_host_fns
-            .push(ApplyHostFn::Sync(Arc::new(host_fn)));
-        self
-    }
-
-    /// Queue function that will asynchronously modify the host before execution.
-    pub fn apply_host_fn_async<F, Fut>(mut self, host_fn: F) -> Self
-    where
-        F: Fn(MockedHost, Message) -> Fut + 'static,
-        Fut: Future<Output = (MockedHost, Message)> + 'static,
-    {
-        let f = Arc::new(host_fn);
-        self.apply_host_fns
-            .push(ApplyHostFn::Async(Arc::new(move |host, msg| {
-                Box::pin({
-                    let f = f.clone();
-                    async move { (f)(host, msg).await }
-                })
-            })));
+        self.apply_host_fns.push(Arc::new(host_fn));
         self
     }
 
@@ -225,22 +195,13 @@ impl EvmTester {
     }
 
     /// Execute provided code, run checks and return bytecode returned by EVM.
-    pub async fn check_and_get_result(mut self) -> Output {
+    pub fn check_and_get_result(self) -> Output {
         println!("Executing code: {}", hex::encode(&self.code));
         let mut host = self.host;
         for f in self.apply_host_fns {
-            match f {
-                ApplyHostFn::Sync(f) => {
-                    (f)(&mut host, &self.message);
-                }
-                ApplyHostFn::Async(f) => {
-                    let (h, m) = (f)(host, self.message).await;
-                    host = h;
-                    self.message = m;
-                }
-            }
+            (f)(&mut host, &self.message);
         }
-        let output = exec(&mut host, self.revision, self.message.clone(), self.code).await;
+        let output = exec(&mut host, self.revision, self.message.clone(), self.code);
 
         if let Some(status_codes) = self.expected_status_codes {
             if !status_codes.iter().any(|s| *s == output.status_code) {
@@ -270,7 +231,7 @@ impl EvmTester {
     }
 
     /// Execute provided code and run checks.
-    pub async fn check(self) {
-        self.check_and_get_result().await;
+    pub fn check(self) {
+        self.check_and_get_result();
     }
 }

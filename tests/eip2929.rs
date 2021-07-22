@@ -2,8 +2,8 @@ use ethereum_types::{H256, U256};
 use evmodin::{host::*, opcode::*, util::*, *};
 use hex_literal::hex;
 
-#[tokio::test]
-async fn eip2929_case1() {
+#[test]
+fn eip2929_case1() {
     // https://gist.github.com/holiman/174548cad102096858583c6fbbb0649a#case-1
     EvmTester::new()
         .revision(Revision::Berlin)
@@ -46,11 +46,10 @@ async fn eip2929_case1() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn eip2929_case2() {
+#[test]
+fn eip2929_case2() {
     // https://gist.github.com/holiman/174548cad102096858583c6fbbb0649a#case-2
     EvmTester::new()
         .revision(Revision::Berlin)
@@ -75,11 +74,10 @@ async fn eip2929_case2() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn eip2929_case3() {
+#[test]
+fn eip2929_case3() {
     // https://gist.github.com/holiman/174548cad102096858583c6fbbb0649a#case-3
     EvmTester::new()
         .revision(Revision::Berlin)
@@ -90,11 +88,10 @@ async fn eip2929_case3() {
         .gas_used(44529)
         .output_data([])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn eip2929_case4() {
+#[test]
+fn eip2929_case4() {
     // https://gist.github.com/holiman/174548cad102096858583c6fbbb0649a#case-4
     EvmTester::new()
         .revision(Revision::Berlin)
@@ -107,11 +104,10 @@ async fn eip2929_case4() {
         .gas_used(2869)
         .output_data([])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn eip2929_op_oog() {
+#[test]
+fn eip2929_op_oog() {
     for (op, gas) in [
         (OpCode::BALANCE, 2603),
         (OpCode::EXTCODESIZE, 2603),
@@ -125,20 +121,18 @@ async fn eip2929_op_oog() {
             .gas(gas)
             .status(StatusCode::Success)
             .gas_used(gas)
-            .check()
-            .await;
+            .check();
 
         t.clone()
             .gas(gas - 1)
             .status(StatusCode::OutOfGas)
             .gas_used(gas - 1)
-            .check()
-            .await;
+            .check();
     }
 }
 
-#[tokio::test]
-async fn eip2929_extcodecopy_oog() {
+#[test]
+fn eip2929_extcodecopy_oog() {
     let t = EvmTester::new().revision(Revision::Berlin).code(
         Bytecode::new()
             .pushv(0)
@@ -152,19 +146,16 @@ async fn eip2929_extcodecopy_oog() {
         .gas(2612)
         .status(StatusCode::Success)
         .gas_used(2612)
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(2611)
+    t.gas(2611)
         .status(StatusCode::OutOfGas)
         .gas_used(2611)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn eip2929_sload_cold() {
+#[test]
+fn eip2929_sload_cold() {
     let key = H256(U256::one().into());
 
     let t = EvmTester::new()
@@ -192,19 +183,16 @@ async fn eip2929_sload_cold() {
                 AccessStatus::Warm
             );
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(2102)
+    t.gas(2102)
         .status(StatusCode::OutOfGas)
         .gas_used(2102)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn eip2929_sload_two_slots() {
+#[test]
+fn eip2929_sload_two_slots() {
     let key0 = H256(U256::from(0).into());
     let key1 = H256(U256::from(1).into());
 
@@ -233,11 +221,10 @@ async fn eip2929_sload_two_slots() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn eip2929_sload_warm() {
+#[test]
+fn eip2929_sload_warm() {
     let key = H256(U256::from(1).into());
     let t = EvmTester::new()
         .revision(Revision::Berlin)
@@ -264,19 +251,16 @@ async fn eip2929_sload_warm() {
                 AccessStatus::Warm
             );
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(102)
+    t.gas(102)
         .status(StatusCode::OutOfGas)
         .gas_used(102)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn eip2929_sstore_modify_cold() {
+#[test]
+fn eip2929_sstore_modify_cold() {
     let key = H256(U256::from(1).into());
     let t = EvmTester::new()
         .revision(Revision::Berlin)
@@ -305,11 +289,9 @@ async fn eip2929_sstore_modify_cold() {
                 AccessStatus::Warm
             );
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(5005)
+    t.gas(5005)
         .status(StatusCode::OutOfGas)
         .gas_used(5005)
         .inspect_host(move |host, msg| {
@@ -323,12 +305,11 @@ async fn eip2929_sstore_modify_cold() {
                 AccessStatus::Warm
             );
         })
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn eip2929_selfdestruct_cold_beneficiary() {
+#[test]
+fn eip2929_selfdestruct_cold_beneficiary() {
     let t = EvmTester::new()
         .revision(Revision::Berlin)
         .code(Bytecode::new().pushv(0xbe).opcode(OpCode::SELFDESTRUCT));
@@ -337,45 +318,37 @@ async fn eip2929_selfdestruct_cold_beneficiary() {
         .gas(7603)
         .status(StatusCode::Success)
         .gas_used(7603)
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(7602)
+    t.gas(7602)
         .status(StatusCode::OutOfGas)
         .gas_used(7602)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn eip2929_selfdestruct_warm_beneficiary() {
+#[test]
+fn eip2929_selfdestruct_warm_beneficiary() {
     let t = EvmTester::new()
         .revision(Revision::Berlin)
         .code(Bytecode::new().pushv(0xbe).opcode(OpCode::SELFDESTRUCT))
-        .apply_host_fn_async(|mut host, msg| async {
+        .apply_host_fn(|host, _| {
             host.access_account(hex!("00000000000000000000000000000000000000be").into());
-
-            (host, msg)
         });
 
     t.clone()
         .gas(5003)
         .status(StatusCode::Success)
         .gas_used(5003)
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(5002)
+    t.gas(5002)
         .status(StatusCode::OutOfGas)
         .gas_used(5002)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn eip2929_delegatecall_cold() {
+#[test]
+fn eip2929_delegatecall_cold() {
     let t = EvmTester::new()
         .revision(Revision::Berlin)
         .code(CallInstruction::delegatecall(0xde));
@@ -395,11 +368,9 @@ async fn eip2929_delegatecall_cold() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(2617)
+    t.gas(2617)
         .status(StatusCode::OutOfGas)
         .gas_used(2617)
         .inspect_host(|host, msg| {
@@ -412,6 +383,5 @@ async fn eip2929_delegatecall_cold() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 }
