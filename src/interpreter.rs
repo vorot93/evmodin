@@ -115,7 +115,7 @@ impl AnalyzedCode {
     }
 
     /// Execute analyzed EVM bytecode.
-    pub async fn execute<H: Host, T: Tracer + 'static>(
+    pub fn execute<H: Host, T: Tracer + 'static>(
         &self,
         host: &mut H,
         mut tracer: T,
@@ -140,26 +140,26 @@ impl AnalyzedCode {
                             ResumeData::Empty
                         }
                         Interrupt::AccountExists { address } => ResumeData::AccountExists {
-                            exists: host.account_exists(address).await.unwrap(),
+                            exists: host.account_exists(address),
                         },
                         Interrupt::GetBalance { address } => ResumeData::Balance {
-                            balance: host.get_balance(address).await.unwrap(),
+                            balance: host.get_balance(address),
                         },
                         Interrupt::GetCodeSize { address } => ResumeData::CodeSize {
-                            code_size: host.get_code_size(address).await.unwrap(),
+                            code_size: host.get_code_size(address),
                         },
                         Interrupt::GetStorage { address, key } => ResumeData::StorageValue {
-                            value: host.get_storage(address, key).await.unwrap(),
+                            value: host.get_storage(address, key),
                         },
                         Interrupt::SetStorage {
                             address,
                             key,
                             value,
                         } => ResumeData::StorageStatus {
-                            status: host.set_storage(address, key, value).await.unwrap(),
+                            status: host.set_storage(address, key, value),
                         },
                         Interrupt::GetCodeHash { address } => ResumeData::CodeHash {
-                            hash: host.get_code_hash(address).await.unwrap(),
+                            hash: host.get_code_hash(address),
                         },
                         Interrupt::CopyCode {
                             address,
@@ -168,10 +168,7 @@ impl AnalyzedCode {
                         } => ResumeData::Code {
                             code: {
                                 let mut code = vec![0; max_size];
-                                let copied = host
-                                    .copy_code(address, offset, &mut code[..])
-                                    .await
-                                    .unwrap();
+                                let copied = host.copy_code(address, offset, &mut code[..]);
                                 if copied > code.len() {
                                     return Output {
                                         status_code: StatusCode::InternalError(format!(
@@ -192,35 +189,33 @@ impl AnalyzedCode {
                             address,
                             beneficiary,
                         } => {
-                            host.selfdestruct(address, beneficiary).await.unwrap();
+                            host.selfdestruct(address, beneficiary);
 
                             ResumeData::Empty
                         }
                         Interrupt::Call { message } => ResumeData::CallOutput {
-                            output: host.call(&message).await.unwrap(),
+                            output: host.call(&message),
                         },
                         Interrupt::GetTxContext => ResumeData::TxContext {
-                            context: host.get_tx_context().await.unwrap(),
+                            context: host.get_tx_context(),
                         },
                         Interrupt::GetBlockHash { block_number } => ResumeData::BlockHash {
-                            hash: host.get_block_hash(block_number).await.unwrap(),
+                            hash: host.get_block_hash(block_number),
                         },
                         Interrupt::EmitLog {
                             address,
                             data,
                             topics,
                         } => {
-                            host.emit_log(address, &*data, topics.as_slice())
-                                .await
-                                .unwrap();
+                            host.emit_log(address, &*data, topics.as_slice());
 
                             ResumeData::Empty
                         }
                         Interrupt::AccessAccount { address } => ResumeData::AccessAccount {
-                            status: host.access_account(address).await.unwrap(),
+                            status: host.access_account(address),
                         },
                         Interrupt::AccessStorage { address, key } => ResumeData::AccessStorage {
-                            status: host.access_storage(address, key).await.unwrap(),
+                            status: host.access_storage(address, key),
                         },
                     };
                 }

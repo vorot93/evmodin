@@ -354,9 +354,7 @@ async fn eip2929_selfdestruct_warm_beneficiary() {
         .revision(Revision::Berlin)
         .code(Bytecode::new().pushv(0xbe).opcode(OpCode::SELFDESTRUCT))
         .apply_host_fn_async(|mut host, msg| async {
-            host.access_account(hex!("00000000000000000000000000000000000000be").into())
-                .await
-                .unwrap();
+            host.access_account(hex!("00000000000000000000000000000000000000be").into());
 
             (host, msg)
         });

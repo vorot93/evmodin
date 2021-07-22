@@ -11,12 +11,10 @@ use std::{future::Future, pin::Pin, sync::Arc};
 async fn exec(host: &mut MockedHost, revision: Revision, message: Message, code: Bytes) -> Output {
     // Add EIP-2929 tweak.
     if revision >= Revision::Berlin {
-        host.access_account(message.sender).await.unwrap();
-        host.access_account(message.destination).await.unwrap();
+        host.access_account(message.sender);
+        host.access_account(message.destination);
     }
-    AnalyzedCode::analyze(code)
-        .execute(host, StdoutTracer::default(), message, revision)
-        .await
+    AnalyzedCode::analyze(code).execute(host, StdoutTracer::default(), message, revision)
 }
 
 #[derive(Clone, Copy, Debug)]
