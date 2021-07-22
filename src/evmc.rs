@@ -3,7 +3,7 @@ use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::{Address, H256, U256};
 use evmc_vm::{
-    ffi::{evmc_address, evmc_bytes32, evmc_uint256be},
+    ffi::{evmc_access_status, evmc_address, evmc_bytes32, evmc_uint256be},
     ExecutionContext, ExecutionMessage, MessageFlags, MessageKind,
 };
 use std::convert::TryInto;
@@ -34,11 +34,19 @@ impl Convert for H256 {
     }
 }
 
-impl From<evmc_vm::ffi::evmc_access_status> for AccessStatus {
-    fn from(s: evmc_vm::ffi::evmc_access_status) -> Self {
+impl Convert for U256 {
+    type Into = evmc_uint256be;
+
+    fn convert(self) -> Self::Into {
+        evmc_uint256be { bytes: self.into() }
+    }
+}
+
+impl From<evmc_access_status> for AccessStatus {
+    fn from(s: evmc_access_status) -> Self {
         match s {
-            evmc_vm::ffi::evmc_access_status::EVMC_ACCESS_COLD => Self::Cold,
-            evmc_vm::ffi::evmc_access_status::EVMC_ACCESS_WARM => Self::Warm,
+            evmc_access_status::EVMC_ACCESS_COLD => Self::Cold,
+            evmc_access_status::EVMC_ACCESS_WARM => Self::Warm,
         }
     }
 }
@@ -103,9 +111,7 @@ impl<'a> Host for ExecutionContext<'a> {
             crate::CallKind::CallCode => MessageKind::EVMC_CALLCODE,
             crate::CallKind::Create => MessageKind::EVMC_CREATE,
             crate::CallKind::Create2 { salt } => {
-                create2_salt = evmc_bytes32 {
-                    bytes: salt.to_fixed_bytes(),
-                };
+                create2_salt = salt.convert();
                 MessageKind::EVMC_CREATE2
             }
         };
@@ -121,16 +127,10 @@ impl<'a> Host for ExecutionContext<'a> {
                 flags,
                 msg.depth,
                 msg.gas,
-                evmc_address {
-                    bytes: msg.destination.to_fixed_bytes(),
-                },
-                evmc_address {
-                    bytes: msg.destination.to_fixed_bytes(),
-                },
+                msg.destination.convert(),
+                msg.sender.convert(),
                 msg.input_data.is_empty().then(|| &*msg.input_data),
-                evmc_uint256be {
-                    bytes: msg.value.into(),
-                },
+                msg.value.convert(),
                 create2_salt,
             ),
         );
