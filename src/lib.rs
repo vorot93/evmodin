@@ -29,7 +29,7 @@
 //!
 //! assert_eq!(
 //!     AnalyzedCode::analyze(my_code)
-//!         .execute(&mut DummyHost, &mut NoopTracer, message, Revision::London)
+//!         .execute(&mut DummyHost, NoopTracer, message, Revision::London)
 //!         .await,
 //!     Output {
 //!         status_code: StatusCode::Success,
