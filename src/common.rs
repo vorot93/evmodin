@@ -206,6 +206,36 @@ pub struct Output {
     pub create_address: Option<Address>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct SuccessfulOutput {
+    pub reverted: bool,
+    pub gas_left: i64,
+    pub output_data: Bytes,
+    pub create_address: Option<Address>,
+}
+
+impl From<SuccessfulOutput> for Output {
+    fn from(
+        SuccessfulOutput {
+            reverted,
+            gas_left,
+            output_data,
+            create_address,
+        }: SuccessfulOutput,
+    ) -> Self {
+        Self {
+            status_code: if reverted {
+                StatusCode::Revert
+            } else {
+                StatusCode::Success
+            },
+            gas_left,
+            output_data,
+            create_address,
+        }
+    }
+}
+
 pub(crate) fn u256_to_address(v: U256) -> Address {
     H256(v.into()).into()
 }

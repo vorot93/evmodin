@@ -13,6 +13,7 @@ pub(crate) fn callvalue(state: &mut ExecutionState) {
     state.stack.push(state.message.value);
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! balance {
     ($co:expr, $state:expr) => {
@@ -21,10 +22,14 @@ macro_rules! balance {
         let address = u256_to_address($state.stack.pop());
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeData::into_access_account(
-                $co.yield_(Interrupt::AccessAccount { address }).await,
+            let access_status = ResumeDataVariant::into_access_account_status(
+                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
+                    address,
+                }))
+                .await,
             )
-            .unwrap();
+            .unwrap()
+            .status;
             if access_status == AccessStatus::Cold {
                 $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
                 if $state.gas_left < 0 {
@@ -33,13 +38,18 @@ macro_rules! balance {
             }
         }
 
-        let balance =
-            ResumeData::into_balance($co.yield_(Interrupt::GetBalance { address }).await).unwrap();
+        let balance = ResumeDataVariant::into_balance(
+            $co.yield_(InterruptDataVariant::GetBalance(GetBalance { address }))
+                .await,
+        )
+        .unwrap()
+        .balance;
 
         $state.stack.push(balance);
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! extcodesize {
     ($co:expr, $state:expr) => {
@@ -48,10 +58,14 @@ macro_rules! extcodesize {
         let address = u256_to_address($state.stack.pop());
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_account = ResumeData::into_access_account(
-                $co.yield_(Interrupt::AccessAccount { address }).await,
+            let access_account = ResumeDataVariant::into_access_account_status(
+                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
+                    address,
+                }))
+                .await,
             )
-            .unwrap();
+            .unwrap()
+            .status;
             if access_account == AccessStatus::Cold {
                 $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
                 if $state.gas_left < 0 {
@@ -60,18 +74,25 @@ macro_rules! extcodesize {
             }
         }
 
-        let code_size =
-            ResumeData::into_code_size($co.yield_(Interrupt::GetCodeSize { address }).await)
-                .unwrap();
+        let code_size = ResumeDataVariant::into_code_size(
+            $co.yield_(InterruptDataVariant::GetCodeSize(GetCodeSize { address }))
+                .await,
+        )
+        .unwrap()
+        .code_size;
         $state.stack.push(code_size);
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! push_txcontext {
     ($co:expr, $state:expr, $accessor:expr) => {
-        let tx_context =
-            ResumeData::into_tx_context($co.yield_(Interrupt::GetTxContext).await).unwrap();
+        let tx_context = ResumeDataVariant::into_tx_context_data(
+            $co.yield_(InterruptDataVariant::GetTxContext).await,
+        )
+        .unwrap()
+        .context;
 
         $state.stack.push($accessor(tx_context));
     };
@@ -113,21 +134,24 @@ pub(crate) fn basefee_accessor(tx_context: TxContext) -> U256 {
     tx_context.block_base_fee
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! selfbalance {
     ($co:expr, $state:expr) => {{
-        let balance = ResumeData::into_balance(
-            $co.yield_(Interrupt::GetBalance {
+        let balance = ResumeDataVariant::into_balance(
+            $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
                 address: $state.message.destination,
-            })
+            }))
             .await,
         )
-        .unwrap();
+        .unwrap()
+        .balance;
 
         $state.stack.push(balance);
     }};
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! blockhash {
     ($co:expr, $state:expr) => {
@@ -135,20 +159,26 @@ macro_rules! blockhash {
 
         let number = $state.stack.pop();
 
-        let upper_bound = ResumeData::into_tx_context($co.yield_(Interrupt::GetTxContext).await)
-            .unwrap()
-            .block_number;
+        let upper_bound = ResumeDataVariant::into_tx_context_data(
+            $co.yield_(InterruptDataVariant::GetTxContext).await,
+        )
+        .unwrap()
+        .context
+        .block_number;
         let lower_bound = upper_bound.saturating_sub(256);
 
         let mut header = H256::zero();
         if number <= u64::MAX.into() {
             let n = number.as_u64();
             if (lower_bound..upper_bound).contains(&n) {
-                header = ResumeData::into_block_hash(
-                    $co.yield_(Interrupt::GetBlockHash { block_number: n })
-                        .await,
+                header = ResumeDataVariant::into_block_hash(
+                    $co.yield_(InterruptDataVariant::GetBlockHash(GetBlockHash {
+                        block_number: n,
+                    }))
+                    .await,
                 )
-                .unwrap();
+                .unwrap()
+                .hash;
             }
         }
 
@@ -156,6 +186,7 @@ macro_rules! blockhash {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! do_log {
     ($co:expr, $state:expr, $num_topics:expr) => {{
@@ -191,17 +222,18 @@ macro_rules! do_log {
             &[]
         };
         let r = $co
-            .yield_(Interrupt::EmitLog {
+            .yield_(InterruptDataVariant::EmitLog(EmitLog {
                 address: $state.message.destination,
                 data: data.to_vec().into(),
                 topics,
-            })
+            }))
             .await;
 
-        assert!(matches!(r, ResumeData::Empty));
+        assert!(matches!(r, ResumeDataVariant::Empty));
     }};
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! sload {
     ($co:expr, $state:expr) => {{
@@ -215,14 +247,15 @@ macro_rules! sload {
         let key = H256($state.stack.pop().into());
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeData::into_access_storage(
-                $co.yield_(Interrupt::AccessStorage {
+            let access_status = ResumeDataVariant::into_access_storage_status(
+                $co.yield_(InterruptDataVariant::AccessStorage(AccessStorage {
                     address: $state.message.destination,
                     key,
-                })
+                }))
                 .await,
             )
-            .unwrap();
+            .unwrap()
+            .status;
             if access_status == AccessStatus::Cold {
                 // The warm storage access cost is already applied (from the cost table).
                 // Here we need to apply additional cold storage access cost.
@@ -234,19 +267,21 @@ macro_rules! sload {
             }
         }
 
-        let storage = ResumeData::into_storage_value(
-            $co.yield_(Interrupt::GetStorage {
+        let storage = ResumeDataVariant::into_storage_value(
+            $co.yield_(InterruptDataVariant::GetStorage(GetStorage {
                 address: $state.message.destination,
                 key,
-            })
+            }))
             .await,
         )
-        .unwrap();
+        .unwrap()
+        .value;
 
         $state.stack.push(U256::from_big_endian(storage.as_bytes()));
     }};
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! sstore {
     ($co:expr, $state:expr) => {{
@@ -270,29 +305,31 @@ macro_rules! sstore {
 
         let mut cost = 0;
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeData::into_access_storage(
-                $co.yield_(Interrupt::AccessStorage {
+            let access_status = ResumeDataVariant::into_access_storage_status(
+                $co.yield_(InterruptDataVariant::AccessStorage(AccessStorage {
                     address: $state.message.destination,
                     key,
-                })
+                }))
                 .await,
             )
-            .unwrap();
+            .unwrap()
+            .status;
 
             if access_status == AccessStatus::Cold {
                 cost = COLD_SLOAD_COST;
             }
         }
 
-        let status = ResumeData::into_storage_status(
-            $co.yield_(Interrupt::SetStorage {
+        let status = ResumeDataVariant::into_storage_status_info(
+            $co.yield_(InterruptDataVariant::SetStorage(SetStorage {
                 address: $state.message.destination,
                 key,
                 value,
-            })
+            }))
             .await,
         )
-        .unwrap();
+        .unwrap()
+        .status;
 
         cost = match status {
             StorageStatus::Unchanged | StorageStatus::ModifiedAgain => {
@@ -322,6 +359,7 @@ macro_rules! sstore {
     }};
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! selfdestruct {
     ($co:expr, $state:expr) => {{
@@ -334,13 +372,14 @@ macro_rules! selfdestruct {
         let beneficiary = u256_to_address($state.stack.pop());
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeData::into_access_account(
-                $co.yield_(Interrupt::AccessAccount {
+            let access_status = ResumeDataVariant::into_access_account_status(
+                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
                     address: beneficiary,
-                })
+                }))
                 .await,
             )
-            .unwrap();
+            .unwrap()
+            .status;
             if access_status == AccessStatus::Cold {
                 $state.gas_left -= i64::from(COLD_ACCOUNT_ACCESS_COST);
                 if $state.gas_left < 0 {
@@ -352,25 +391,27 @@ macro_rules! selfdestruct {
         if $state.evm_revision >= Revision::Tangerine
             && ($state.evm_revision == Revision::Tangerine
                 || !{
-                    ResumeData::into_balance(
-                        $co.yield_(Interrupt::GetBalance {
+                    ResumeDataVariant::into_balance(
+                        $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
                             address: $state.message.destination,
-                        })
+                        }))
                         .await,
                     )
                     .unwrap()
+                    .balance
                     .is_zero()
                 })
         {
             // After TANGERINE_WHISTLE apply additional cost of
             // sending value to a non-existing account.
-            if !ResumeData::into_account_exists(
-                $co.yield_(Interrupt::AccountExists {
+            if !ResumeDataVariant::into_account_exists_status(
+                $co.yield_(InterruptDataVariant::AccountExists(AccountExists {
                     address: beneficiary,
-                })
+                }))
                 .await,
             )
             .unwrap()
+            .exists
             {
                 $state.gas_left -= 25000;
                 if $state.gas_left < 0 {
@@ -380,12 +421,12 @@ macro_rules! selfdestruct {
         }
 
         assert!(matches!(
-            $co.yield_(Interrupt::Selfdestruct {
+            $co.yield_(InterruptDataVariant::Selfdestruct(Selfdestruct {
                 address: $state.message.destination,
                 beneficiary,
-            })
+            }))
             .await,
-            ResumeData::Empty
+            ResumeDataVariant::Empty
         ));
     }};
 }

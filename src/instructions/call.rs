@@ -1,3 +1,4 @@
+#[doc(hidden)]
 #[macro_export]
 macro_rules! do_call {
     ($co:expr, $state:expr, $kind:expr, $is_static:expr) => {{
@@ -26,10 +27,14 @@ macro_rules! do_call {
         $state.stack.push(U256::zero()); // Assume failure.
 
         if $state.evm_revision >= Revision::Berlin
-            && ResumeData::into_access_account(
-                $co.yield_(Interrupt::AccessAccount { address: dst }).await,
+            && ResumeDataVariant::into_access_account_status(
+                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
+                    address: dst,
+                }))
+                .await,
             )
             .unwrap()
+            .status
                 == AccessStatus::Cold
         {
             $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
@@ -74,10 +79,14 @@ macro_rules! do_call {
             }
 
             if (has_value || $state.evm_revision < Revision::Spurious)
-                && !ResumeData::into_account_exists(
-                    $co.yield_(Interrupt::AccountExists { address: dst }).await,
+                && !ResumeDataVariant::into_account_exists_status(
+                    $co.yield_(InterruptDataVariant::AccountExists(AccountExists {
+                        address: dst,
+                    }))
+                    .await,
                 )
                 .unwrap()
+                .exists
             {
                 cost += 25000;
             }
@@ -107,19 +116,23 @@ macro_rules! do_call {
 
         if $state.message.depth < 1024
             && !(has_value
-                && ResumeData::into_balance(
-                    $co.yield_(Interrupt::GetBalance {
+                && ResumeDataVariant::into_balance(
+                    $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
                         address: $state.message.destination,
-                    })
+                    }))
                     .await,
                 )
                 .unwrap()
+                .balance
                     < value)
         {
             let msg_gas = msg.gas;
-            let result =
-                ResumeData::into_call_output($co.yield_(Interrupt::Call { message: msg }).await)
-                    .unwrap();
+            let result = ResumeDataVariant::into_call_output(
+                $co.yield_(InterruptDataVariant::Call(Call { message: msg }))
+                    .await,
+            )
+            .unwrap()
+            .output;
             $state.return_data = result.output_data.clone();
             *$state.stack.get_mut(0) = if matches!(result.status_code, StatusCode::Success) {
                 U256::one()
@@ -141,6 +154,7 @@ macro_rules! do_call {
     }};
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! do_create {
     ($co:expr, $state:expr, $create2:expr) => {{
@@ -181,13 +195,14 @@ macro_rules! do_create {
 
         if $state.message.depth < 1024
             && !(!endowment.is_zero()
-                && ResumeData::into_balance(
-                    $co.yield_(Interrupt::GetBalance {
+                && ResumeDataVariant::into_balance(
+                    $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
                         address: $state.message.destination,
-                    })
+                    }))
                     .await,
                 )
                 .unwrap()
+                .balance
                     < endowment)
         {
             let msg = Message {
@@ -214,9 +229,12 @@ macro_rules! do_create {
                 value: endowment,
             };
             let msg_gas = msg.gas;
-            let result =
-                ResumeData::into_call_output($co.yield_(Interrupt::Call { message: msg }).await)
-                    .unwrap();
+            let result = ResumeDataVariant::into_call_output(
+                $co.yield_(InterruptDataVariant::Call(Call { message: msg }))
+                    .await,
+            )
+            .unwrap()
+            .output;
             $state.gas_left -= msg_gas - result.gas_left;
 
             $state.return_data = result.output_data;

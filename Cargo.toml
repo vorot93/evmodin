@@ -8,6 +8,7 @@ license = "Apache-2.0"
 anyhow = { version = "1", default-features = false }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bytes = { version = "1", default-features = false, features = ["serde"] }
+derive_more = "0.99"
 educe = { version = "0.4", default-features = false, optional = true }
 enum-as-inner = "0.3"
 evmc-vm = { git = "https://github.com/ethereum/evmc", optional = true }

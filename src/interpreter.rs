@@ -1,5 +1,6 @@
 use self::instruction_table::*;
 use crate::{
+    common::*,
     continuation::*,
     instructions::{control::*, stack_manip::*, *},
     state::*,
@@ -8,7 +9,6 @@ use crate::{
 };
 use ethereum_types::{Address, U256};
 use genawaiter::{sync::*, *};
-use std::pin::Pin;
 
 fn check_requirements(
     instruction_table: &InstructionTable,
@@ -126,101 +126,89 @@ impl AnalyzedCode {
             tracer.notify_execution_start(revision, message.clone(), self.code.clone());
         }
 
-        let mut c = self.execute_with_state(ExecutionState::new(message, revision), !T::DUMMY);
-
-        let mut resume_data = ResumeData::Empty;
+        let mut interrupt =
+            InterruptVariant::ExecutionStart(self.execute_resumable(!T::DUMMY, message, revision));
 
         loop {
-            match Pin::new(&mut c).resume_with(resume_data) {
-                GeneratorState::Yielded(interrupt) => {
-                    resume_data = match interrupt {
-                        Interrupt::InstructionStart { pc, opcode, state } => {
-                            tracer.notify_instruction_start(pc, opcode, &state);
-
-                            ResumeData::Empty
-                        }
-                        Interrupt::AccountExists { address } => ResumeData::AccountExists {
-                            exists: host.account_exists(address),
-                        },
-                        Interrupt::GetBalance { address } => ResumeData::Balance {
-                            balance: host.get_balance(address),
-                        },
-                        Interrupt::GetCodeSize { address } => ResumeData::CodeSize {
-                            code_size: host.get_code_size(address),
-                        },
-                        Interrupt::GetStorage { address, key } => ResumeData::StorageValue {
-                            value: host.get_storage(address, key),
-                        },
-                        Interrupt::SetStorage {
-                            address,
-                            key,
-                            value,
-                        } => ResumeData::StorageStatus {
-                            status: host.set_storage(address, key, value),
-                        },
-                        Interrupt::GetCodeHash { address } => ResumeData::CodeHash {
-                            hash: host.get_code_hash(address),
-                        },
-                        Interrupt::CopyCode {
-                            address,
-                            offset,
-                            max_size,
-                        } => ResumeData::Code {
-                            code: {
-                                let mut code = vec![0; max_size];
-                                let copied = host.copy_code(address, offset, &mut code[..]);
-                                if copied > code.len() {
-                                    return Output {
-                                        status_code: StatusCode::InternalError(format!(
-                                            "copy code: copied {} > max size {}",
-                                            copied,
-                                            code.len()
-                                        )),
-                                        gas_left: 0,
-                                        output_data: Bytes::new(),
-                                        create_address: None,
-                                    };
-                                }
-                                code.truncate(copied);
-                                code.into()
-                            },
-                        },
-                        Interrupt::Selfdestruct {
-                            address,
-                            beneficiary,
-                        } => {
-                            host.selfdestruct(address, beneficiary);
-
-                            ResumeData::Empty
-                        }
-                        Interrupt::Call { message } => ResumeData::CallOutput {
-                            output: host.call(&message),
-                        },
-                        Interrupt::GetTxContext => ResumeData::TxContext {
-                            context: host.get_tx_context(),
-                        },
-                        Interrupt::GetBlockHash { block_number } => ResumeData::BlockHash {
-                            hash: host.get_block_hash(block_number),
-                        },
-                        Interrupt::EmitLog {
-                            address,
-                            data,
-                            topics,
-                        } => {
-                            host.emit_log(address, &*data, topics.as_slice());
-
-                            ResumeData::Empty
-                        }
-                        Interrupt::AccessAccount { address } => ResumeData::AccessAccount {
-                            status: host.access_account(address),
-                        },
-                        Interrupt::AccessStorage { address, key } => ResumeData::AccessStorage {
-                            status: host.access_storage(address, key),
-                        },
-                    };
+            interrupt = match interrupt {
+                InterruptVariant::ExecutionStart(i) => i.resume(()),
+                InterruptVariant::InstructionStart(i) => {
+                    tracer.notify_instruction_start(i.data.pc, i.data.opcode, &i.data.state);
+                    i.resume(())
                 }
-                GeneratorState::Complete(res) => {
-                    let output = match res {
+                InterruptVariant::AccountExists(i) => {
+                    let exists = host.account_exists(i.data.address);
+                    i.resume(AccountExistsStatus { exists })
+                }
+                InterruptVariant::GetBalance(i) => {
+                    let balance = host.get_balance(i.data.address);
+                    i.resume(Balance { balance })
+                }
+                InterruptVariant::GetCodeSize(i) => {
+                    let code_size = host.get_code_size(i.data.address);
+                    i.resume(CodeSize { code_size })
+                }
+                InterruptVariant::GetStorage(i) => {
+                    let value = host.get_storage(i.data.address, i.data.key);
+                    i.resume(StorageValue { value })
+                }
+                InterruptVariant::SetStorage(i) => {
+                    let status = host.set_storage(i.data.address, i.data.key, i.data.value);
+                    i.resume(StorageStatusInfo { status })
+                }
+                InterruptVariant::GetCodeHash(i) => {
+                    let hash = host.get_code_hash(i.data.address);
+                    i.resume(CodeHash { hash })
+                }
+                InterruptVariant::CopyCode(i) => {
+                    let mut code = vec![0; i.data.max_size];
+                    let copied = host.copy_code(i.data.address, i.data.offset, &mut code[..]);
+                    if copied > code.len() {
+                        return Output {
+                            status_code: StatusCode::InternalError(format!(
+                                "copy code: copied {} > max size {}",
+                                copied,
+                                code.len()
+                            )),
+                            gas_left: 0,
+                            output_data: Bytes::new(),
+                            create_address: None,
+                        };
+                    }
+                    code.truncate(copied);
+                    let code = code.into();
+                    i.resume(Code { code })
+                }
+                InterruptVariant::Selfdestruct(i) => {
+                    host.selfdestruct(i.data.address, i.data.beneficiary);
+                    i.resume(())
+                }
+                InterruptVariant::Call(i) => {
+                    let output = host.call(&i.data.message);
+                    i.resume(CallOutput { output })
+                }
+                InterruptVariant::GetTxContext(i) => {
+                    let context = host.get_tx_context();
+                    i.resume(TxContextData { context })
+                }
+                InterruptVariant::GetBlockHash(i) => {
+                    let hash = host.get_block_hash(i.data.block_number);
+                    i.resume(BlockHash { hash })
+                }
+                InterruptVariant::EmitLog(i) => {
+                    host.emit_log(i.data.address, &*i.data.data, i.data.topics.as_slice());
+                    i.resume(())
+                }
+                InterruptVariant::AccessAccount(i) => {
+                    let status = host.access_account(i.data.address);
+                    i.resume(AccessAccountStatus { status })
+                }
+                InterruptVariant::AccessStorage(i) => {
+                    let status = host.access_storage(i.data.address, i.data.key);
+                    i.resume(AccessStorageStatus { status })
+                }
+                InterruptVariant::Complete(i) => {
+                    let output = match i.data {
                         Ok(output) => output.into(),
                         Err(status_code) => Output {
                             status_code,
@@ -236,7 +224,7 @@ impl AnalyzedCode {
 
                     return output;
                 }
-            }
+            };
         }
     }
 
@@ -245,18 +233,30 @@ impl AnalyzedCode {
         state: ExecutionState,
         trace: bool,
     ) -> impl Coroutine<
-        Yield = Interrupt,
-        Resume = ResumeData,
+        Yield = InterruptDataVariant,
+        Resume = ResumeDataVariant,
         Return = Result<SuccessfulOutput, StatusCode>,
     > + Send
-           + Unpin
-           + '_ {
-        Gen::new(move |co| interpreter_producer(co, self.clone(), state, trace))
+           + Unpin {
+        let code = self.clone();
+        Gen::new(move |co| interpreter_producer(co, code, state, trace))
+    }
+
+    pub fn execute_resumable(
+        &self,
+        trace: bool,
+        message: Message,
+        revision: Revision,
+    ) -> ExecutionStartInterrupt {
+        ExecutionStartInterrupt {
+            inner: Box::pin(self.execute_with_state(ExecutionState::new(message, revision), trace)),
+            data: (),
+        }
     }
 }
 
 async fn interpreter_producer(
-    mut co: Co<Interrupt, ResumeData>,
+    mut co: Co<InterruptDataVariant, ResumeDataVariant>,
     s: AnalyzedCode,
     mut state: ExecutionState,
     trace: bool,
@@ -274,11 +274,13 @@ async fn interpreter_producer(
 
         // Do not print stop on the final STOP
         if trace && pc != s.code.len() - 1 {
-            co.yield_(Interrupt::InstructionStart {
-                pc,
-                opcode: op,
-                state: state.clone(),
-            })
+            co.yield_(InterruptDataVariant::InstructionStart(Box::new(
+                InstructionStart {
+                    pc,
+                    opcode: op,
+                    state: state.clone(),
+                },
+            )))
             .await;
         }
 
@@ -607,33 +609,4 @@ async fn interpreter_producer(
     };
 
     Ok(output)
-}
-
-struct SuccessfulOutput {
-    reverted: bool,
-    gas_left: i64,
-    output_data: Bytes,
-    create_address: Option<Address>,
-}
-
-impl From<SuccessfulOutput> for Output {
-    fn from(
-        SuccessfulOutput {
-            reverted,
-            gas_left,
-            output_data,
-            create_address,
-        }: SuccessfulOutput,
-    ) -> Self {
-        Self {
-            status_code: if reverted {
-                StatusCode::Revert
-            } else {
-                StatusCode::Success
-            },
-            gas_left,
-            output_data,
-            create_address,
-        }
-    }
 }

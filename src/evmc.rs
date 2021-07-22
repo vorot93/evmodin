@@ -3,7 +3,7 @@ use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::{Address, H256, U256};
 use evmc_vm::{
-    ffi::{evmc_access_status, evmc_address, evmc_bytes32, evmc_uint256be},
+    ffi::{evmc_access_status, evmc_address, evmc_bytes32, evmc_storage_status, evmc_uint256be},
     ExecutionContext, ExecutionMessage, MessageFlags, MessageKind,
 };
 use std::convert::TryInto;
@@ -69,13 +69,11 @@ impl<'a> Host for ExecutionContext<'a> {
             &key.convert(),
             &value.convert(),
         ) {
-            evmc_vm::ffi::evmc_storage_status::EVMC_STORAGE_UNCHANGED => StorageStatus::Unchanged,
-            evmc_vm::ffi::evmc_storage_status::EVMC_STORAGE_MODIFIED => StorageStatus::Modified,
-            evmc_vm::ffi::evmc_storage_status::EVMC_STORAGE_MODIFIED_AGAIN => {
-                StorageStatus::ModifiedAgain
-            }
-            evmc_vm::ffi::evmc_storage_status::EVMC_STORAGE_ADDED => StorageStatus::Added,
-            evmc_vm::ffi::evmc_storage_status::EVMC_STORAGE_DELETED => StorageStatus::Deleted,
+            evmc_storage_status::EVMC_STORAGE_UNCHANGED => StorageStatus::Unchanged,
+            evmc_storage_status::EVMC_STORAGE_MODIFIED => StorageStatus::Modified,
+            evmc_storage_status::EVMC_STORAGE_MODIFIED_AGAIN => StorageStatus::ModifiedAgain,
+            evmc_storage_status::EVMC_STORAGE_ADDED => StorageStatus::Added,
+            evmc_storage_status::EVMC_STORAGE_DELETED => StorageStatus::Deleted,
         }
     }
 
