@@ -1,9 +1,3 @@
-use crate::{
-    common::{Revision, StatusCode},
-    state::ExecutionState,
-};
-use ethereum_types::U256;
-
 pub(crate) mod arithmetic;
 pub(crate) mod bitwise;
 pub(crate) mod boolean;

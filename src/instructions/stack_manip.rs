@@ -1,17 +1,17 @@
-use super::*;
 use crate::state::*;
+use ethereum_types::U256;
 
-pub(crate) fn load_push<const N: usize>(stack: &mut Stack, code: &[u8]) -> usize {
-    stack.push(U256::from_big_endian(&code[..N]));
-    N
+pub(crate) fn load_push(stack: &mut Stack, code: &[u8], push_len: usize) -> usize {
+    stack.push(U256::from_big_endian(&code[..push_len]));
+    push_len
 }
 
-pub(crate) fn dup<const N: usize>(stack: &mut Stack) {
-    stack.push(*stack.get(N - 1));
+pub(crate) fn dup(stack: &mut Stack, height: usize) {
+    stack.push(*stack.get(height - 1));
 }
 
-pub(crate) fn swap<const N: usize>(stack: &mut Stack) {
-    stack.swap_top(N);
+pub(crate) fn swap(stack: &mut Stack, height: usize) {
+    stack.swap_top(height);
 }
 
 pub(crate) fn pop(stack: &mut Stack) {
