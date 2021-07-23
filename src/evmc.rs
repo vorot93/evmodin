@@ -1,11 +1,8 @@
 use crate::{common::*, host::*};
+use ::evmc_vm::{ffi::*, ExecutionContext, ExecutionMessage, MessageFlags, MessageKind};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::{Address, H256, U256};
-use evmc_vm::{
-    ffi::{evmc_access_status, evmc_address, evmc_bytes32, evmc_storage_status, evmc_uint256be},
-    ExecutionContext, ExecutionMessage, MessageFlags, MessageKind,
-};
 use std::convert::TryInto;
 
 pub(crate) trait Convert {
@@ -135,55 +132,31 @@ impl<'a> Host for ExecutionContext<'a> {
 
         Output {
             status_code: match execution_result.status_code() {
-                evmc_vm::ffi::evmc_status_code::EVMC_SUCCESS => StatusCode::Success,
-                evmc_vm::ffi::evmc_status_code::EVMC_FAILURE => StatusCode::Failure,
-                evmc_vm::ffi::evmc_status_code::EVMC_REVERT => StatusCode::Revert,
-                evmc_vm::ffi::evmc_status_code::EVMC_OUT_OF_GAS => StatusCode::OutOfGas,
-                evmc_vm::ffi::evmc_status_code::EVMC_INVALID_INSTRUCTION => {
-                    StatusCode::InvalidInstruction
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_UNDEFINED_INSTRUCTION => {
-                    StatusCode::UndefinedInstruction
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_STACK_OVERFLOW => StatusCode::StackOverflow,
-                evmc_vm::ffi::evmc_status_code::EVMC_STACK_UNDERFLOW => StatusCode::StackUnderflow,
-                evmc_vm::ffi::evmc_status_code::EVMC_BAD_JUMP_DESTINATION => {
-                    StatusCode::BadJumpDestination
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_INVALID_MEMORY_ACCESS => {
-                    StatusCode::InvalidMemoryAccess
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_CALL_DEPTH_EXCEEDED => {
-                    StatusCode::CallDepthExceeded
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_STATIC_MODE_VIOLATION => {
-                    StatusCode::StaticModeViolation
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_PRECOMPILE_FAILURE => {
-                    StatusCode::PrecompileFailure
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_CONTRACT_VALIDATION_FAILURE => {
+                evmc_status_code::EVMC_SUCCESS => StatusCode::Success,
+                evmc_status_code::EVMC_FAILURE => StatusCode::Failure,
+                evmc_status_code::EVMC_REVERT => StatusCode::Revert,
+                evmc_status_code::EVMC_OUT_OF_GAS => StatusCode::OutOfGas,
+                evmc_status_code::EVMC_INVALID_INSTRUCTION => StatusCode::InvalidInstruction,
+                evmc_status_code::EVMC_UNDEFINED_INSTRUCTION => StatusCode::UndefinedInstruction,
+                evmc_status_code::EVMC_STACK_OVERFLOW => StatusCode::StackOverflow,
+                evmc_status_code::EVMC_STACK_UNDERFLOW => StatusCode::StackUnderflow,
+                evmc_status_code::EVMC_BAD_JUMP_DESTINATION => StatusCode::BadJumpDestination,
+                evmc_status_code::EVMC_INVALID_MEMORY_ACCESS => StatusCode::InvalidMemoryAccess,
+                evmc_status_code::EVMC_CALL_DEPTH_EXCEEDED => StatusCode::CallDepthExceeded,
+                evmc_status_code::EVMC_STATIC_MODE_VIOLATION => StatusCode::StaticModeViolation,
+                evmc_status_code::EVMC_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
+                evmc_status_code::EVMC_CONTRACT_VALIDATION_FAILURE => {
                     StatusCode::InternalError("ContractValidationFailure".into())
                 }
-                evmc_vm::ffi::evmc_status_code::EVMC_ARGUMENT_OUT_OF_RANGE => {
-                    StatusCode::ArgumentOutOfRange
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_WASM_UNREACHABLE_INSTRUCTION => {
+                evmc_status_code::EVMC_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
+                evmc_status_code::EVMC_WASM_UNREACHABLE_INSTRUCTION => {
                     StatusCode::InternalError("WasmUnreachableInstruction".into())
                 }
-                evmc_vm::ffi::evmc_status_code::EVMC_WASM_TRAP => {
-                    StatusCode::InternalError("WasmTrap".into())
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_INSUFFICIENT_BALANCE => {
-                    StatusCode::InsufficientBalance
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_INTERNAL_ERROR => {
-                    StatusCode::InternalError(String::new())
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_REJECTED => {
-                    StatusCode::InternalError("Rejected".into())
-                }
-                evmc_vm::ffi::evmc_status_code::EVMC_OUT_OF_MEMORY => {
+                evmc_status_code::EVMC_WASM_TRAP => StatusCode::InternalError("WasmTrap".into()),
+                evmc_status_code::EVMC_INSUFFICIENT_BALANCE => StatusCode::InsufficientBalance,
+                evmc_status_code::EVMC_INTERNAL_ERROR => StatusCode::InternalError(String::new()),
+                evmc_status_code::EVMC_REJECTED => StatusCode::InternalError("Rejected".into()),
+                evmc_status_code::EVMC_OUT_OF_MEMORY => {
                     StatusCode::InternalError("OutOfMemory".into())
                 }
             },
