@@ -28,7 +28,7 @@
 //!
 //! assert_eq!(
 //!     AnalyzedCode::analyze(my_code)
-//!         .execute(&mut DummyHost, NoopTracer, message, Revision::London),
+//!         .execute(&mut DummyHost, NoopTracer, message, Revision::latest()),
 //!     Output {
 //!         status_code: StatusCode::Success,
 //!         gas_left: 146,

@@ -36,6 +36,9 @@ pub enum Revision {
 
     /// [The London revision.](https://github.com/ethereum/eth1.0-specs/blob/master/network-upgrades/mainnet-upgrades/london.md)
     London = 9,
+
+    /// The Shanghai revision.
+    Shanghai = 10,
 }
 
 impl Revision {
@@ -51,17 +54,18 @@ impl Revision {
             Self::Istanbul,
             Self::Berlin,
             Self::London,
+            Self::Shanghai,
         ])
             .iter()
             .copied()
     }
 
-    pub const fn len() -> usize {
-        Self::London as usize + 1
+    pub const fn latest() -> Self {
+        Self::Shanghai
     }
 
-    pub const fn latest() -> Self {
-        Self::London
+    pub const fn len() -> usize {
+        Self::latest() as usize + 1
     }
 }
 

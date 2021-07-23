@@ -11,6 +11,7 @@ bytes = { version = "1", default-features = false, features = ["serde"] }
 derive_more = "0.99"
 educe = { version = "0.4", default-features = false, optional = true }
 enum-as-inner = "0.3"
+evmc-declare = { git = "https://github.com/ethereum/evmc", optional = true }
 evmc-vm = { git = "https://github.com/ethereum/evmc", optional = true }
 i256 = { git = "https://github.com/vorot93/rust-i256" }
 ethereum-types = { version = "0.12", default-features = false }
@@ -34,5 +35,5 @@ hex-literal = "0.3"
 rand = { version = "0.8", features = ["std"] }
 
 [features]
-evmc = ["evmc-vm"]
+evmc = ["evmc-declare", "evmc-vm"]
 util = ["educe/Debug", "hex-literal", "parking_lot"]

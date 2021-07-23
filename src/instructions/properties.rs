@@ -368,5 +368,6 @@ pub fn gas_costs(revision: Revision) -> &'static [Option<u16>; 256] {
         Revision::Istanbul => &ISTANBUL_GAS_COSTS,
         Revision::Berlin => &BERLIN_GAS_COSTS,
         Revision::London => &LONDON_GAS_COSTS,
+        Revision::Shanghai => &LONDON_GAS_COSTS,
     }
 }

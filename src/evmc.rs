@@ -1,8 +1,10 @@
-use crate::{common::*, host::*};
-use ::evmc_vm::{ffi::*, ExecutionContext, ExecutionMessage, MessageFlags, MessageKind};
+use crate::{common::*, host::*, tracing::NoopTracer, AnalyzedCode};
+use ::evmc_vm;
+use ::evmc_vm::{ffi::*, EvmcVm, ExecutionContext, ExecutionMessage, MessageFlags, MessageKind};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::{Address, H256, U256};
+use evmc_vm::ExecutionResult;
 use std::convert::TryInto;
 
 pub(crate) trait Convert {
@@ -44,6 +46,122 @@ impl From<evmc_access_status> for AccessStatus {
         match s {
             evmc_access_status::EVMC_ACCESS_COLD => Self::Cold,
             evmc_access_status::EVMC_ACCESS_WARM => Self::Warm,
+        }
+    }
+}
+
+impl From<Message> for ExecutionMessage {
+    fn from(msg: Message) -> Self {
+        let mut create2_salt = evmc_bytes32::default();
+        let kind = match msg.kind {
+            crate::CallKind::Call => MessageKind::EVMC_CALL,
+            crate::CallKind::DelegateCall => MessageKind::EVMC_DELEGATECALL,
+            crate::CallKind::CallCode => MessageKind::EVMC_CALLCODE,
+            crate::CallKind::Create => MessageKind::EVMC_CREATE,
+            crate::CallKind::Create2 { salt } => {
+                create2_salt = salt.convert();
+                MessageKind::EVMC_CREATE2
+            }
+        };
+        let flags = if msg.is_static {
+            MessageFlags::EVMC_STATIC as u32
+        } else {
+            0
+        };
+
+        ExecutionMessage::new(
+            kind,
+            flags,
+            msg.depth,
+            msg.gas,
+            msg.destination.convert(),
+            msg.sender.convert(),
+            msg.input_data.is_empty().then(|| &*msg.input_data),
+            msg.value.convert(),
+            create2_salt,
+        )
+    }
+}
+
+impl Message {
+    fn from_evmc(msg: &ExecutionMessage) -> Self {
+        let kind = match msg.kind() {
+            evmc_call_kind::EVMC_CALL => CallKind::Call,
+            evmc_call_kind::EVMC_DELEGATECALL => CallKind::DelegateCall,
+            evmc_call_kind::EVMC_CALLCODE => CallKind::CallCode,
+            evmc_call_kind::EVMC_CREATE => CallKind::Create,
+            evmc_call_kind::EVMC_CREATE2 => CallKind::Create2 {
+                salt: msg.create2_salt().bytes.into(),
+            },
+        };
+
+        Self {
+            kind,
+            is_static: msg.flags() == evmc_vm::ffi::evmc_flags::EVMC_STATIC as u32,
+            depth: msg.depth(),
+            gas: msg.gas(),
+            destination: msg.destination().bytes.into(),
+            sender: msg.sender().bytes.into(),
+            input_data: msg
+                .input()
+                .map(|v| v.clone().into())
+                .unwrap_or_else(Bytes::new),
+            value: msg.value().bytes.into(),
+        }
+    }
+}
+
+impl From<evmc_status_code> for StatusCode {
+    fn from(status: evmc_status_code) -> Self {
+        match status {
+            evmc_status_code::EVMC_SUCCESS => StatusCode::Success,
+            evmc_status_code::EVMC_FAILURE => StatusCode::Failure,
+            evmc_status_code::EVMC_REVERT => StatusCode::Revert,
+            evmc_status_code::EVMC_OUT_OF_GAS => StatusCode::OutOfGas,
+            evmc_status_code::EVMC_INVALID_INSTRUCTION => StatusCode::InvalidInstruction,
+            evmc_status_code::EVMC_UNDEFINED_INSTRUCTION => StatusCode::UndefinedInstruction,
+            evmc_status_code::EVMC_STACK_OVERFLOW => StatusCode::StackOverflow,
+            evmc_status_code::EVMC_STACK_UNDERFLOW => StatusCode::StackUnderflow,
+            evmc_status_code::EVMC_BAD_JUMP_DESTINATION => StatusCode::BadJumpDestination,
+            evmc_status_code::EVMC_INVALID_MEMORY_ACCESS => StatusCode::InvalidMemoryAccess,
+            evmc_status_code::EVMC_CALL_DEPTH_EXCEEDED => StatusCode::CallDepthExceeded,
+            evmc_status_code::EVMC_STATIC_MODE_VIOLATION => StatusCode::StaticModeViolation,
+            evmc_status_code::EVMC_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
+            evmc_status_code::EVMC_CONTRACT_VALIDATION_FAILURE => {
+                StatusCode::InternalError("ContractValidationFailure".into())
+            }
+            evmc_status_code::EVMC_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
+            evmc_status_code::EVMC_WASM_UNREACHABLE_INSTRUCTION => {
+                StatusCode::InternalError("WasmUnreachableInstruction".into())
+            }
+            evmc_status_code::EVMC_WASM_TRAP => StatusCode::InternalError("WasmTrap".into()),
+            evmc_status_code::EVMC_INSUFFICIENT_BALANCE => StatusCode::InsufficientBalance,
+            evmc_status_code::EVMC_INTERNAL_ERROR => StatusCode::InternalError(String::new()),
+            evmc_status_code::EVMC_REJECTED => StatusCode::InternalError("Rejected".into()),
+            evmc_status_code::EVMC_OUT_OF_MEMORY => StatusCode::InternalError("OutOfMemory".into()),
+        }
+    }
+}
+
+impl From<StatusCode> for evmc_status_code {
+    fn from(status: StatusCode) -> Self {
+        match status {
+            StatusCode::Success => evmc_status_code::EVMC_SUCCESS,
+            StatusCode::Failure => evmc_status_code::EVMC_FAILURE,
+            StatusCode::Revert => evmc_status_code::EVMC_REVERT,
+            StatusCode::OutOfGas => evmc_status_code::EVMC_OUT_OF_GAS,
+            StatusCode::InvalidInstruction => evmc_status_code::EVMC_INVALID_INSTRUCTION,
+            StatusCode::UndefinedInstruction => evmc_status_code::EVMC_UNDEFINED_INSTRUCTION,
+            StatusCode::StackOverflow => evmc_status_code::EVMC_STACK_OVERFLOW,
+            StatusCode::StackUnderflow => evmc_status_code::EVMC_STACK_UNDERFLOW,
+            StatusCode::BadJumpDestination => evmc_status_code::EVMC_BAD_JUMP_DESTINATION,
+            StatusCode::InvalidMemoryAccess => evmc_status_code::EVMC_INVALID_MEMORY_ACCESS,
+            StatusCode::CallDepthExceeded => evmc_status_code::EVMC_CALL_DEPTH_EXCEEDED,
+            StatusCode::StaticModeViolation => evmc_status_code::EVMC_STATIC_MODE_VIOLATION,
+            StatusCode::PrecompileFailure => evmc_status_code::EVMC_PRECOMPILE_FAILURE,
+            StatusCode::ArgumentOutOfRange => evmc_status_code::EVMC_ARGUMENT_OUT_OF_RANGE,
+            StatusCode::InsufficientBalance => evmc_status_code::EVMC_INSUFFICIENT_BALANCE,
+            StatusCode::InternalError(_) => evmc_status_code::EVMC_INTERNAL_ERROR,
         }
     }
 }
@@ -99,67 +217,10 @@ impl<'a> Host for ExecutionContext<'a> {
     }
 
     fn call(&mut self, msg: &Message) -> Output {
-        let mut create2_salt = evmc_bytes32::default();
-        let kind = match msg.kind {
-            crate::CallKind::Call => MessageKind::EVMC_CALL,
-            crate::CallKind::DelegateCall => MessageKind::EVMC_DELEGATECALL,
-            crate::CallKind::CallCode => MessageKind::EVMC_CALLCODE,
-            crate::CallKind::Create => MessageKind::EVMC_CREATE,
-            crate::CallKind::Create2 { salt } => {
-                create2_salt = salt.convert();
-                MessageKind::EVMC_CREATE2
-            }
-        };
-        let flags = if msg.is_static {
-            MessageFlags::EVMC_STATIC as u32
-        } else {
-            0
-        };
-        let execution_result = ExecutionContext::call(
-            self,
-            &ExecutionMessage::new(
-                kind,
-                flags,
-                msg.depth,
-                msg.gas,
-                msg.destination.convert(),
-                msg.sender.convert(),
-                msg.input_data.is_empty().then(|| &*msg.input_data),
-                msg.value.convert(),
-                create2_salt,
-            ),
-        );
+        let execution_result = ExecutionContext::call(self, &msg.clone().into());
 
         Output {
-            status_code: match execution_result.status_code() {
-                evmc_status_code::EVMC_SUCCESS => StatusCode::Success,
-                evmc_status_code::EVMC_FAILURE => StatusCode::Failure,
-                evmc_status_code::EVMC_REVERT => StatusCode::Revert,
-                evmc_status_code::EVMC_OUT_OF_GAS => StatusCode::OutOfGas,
-                evmc_status_code::EVMC_INVALID_INSTRUCTION => StatusCode::InvalidInstruction,
-                evmc_status_code::EVMC_UNDEFINED_INSTRUCTION => StatusCode::UndefinedInstruction,
-                evmc_status_code::EVMC_STACK_OVERFLOW => StatusCode::StackOverflow,
-                evmc_status_code::EVMC_STACK_UNDERFLOW => StatusCode::StackUnderflow,
-                evmc_status_code::EVMC_BAD_JUMP_DESTINATION => StatusCode::BadJumpDestination,
-                evmc_status_code::EVMC_INVALID_MEMORY_ACCESS => StatusCode::InvalidMemoryAccess,
-                evmc_status_code::EVMC_CALL_DEPTH_EXCEEDED => StatusCode::CallDepthExceeded,
-                evmc_status_code::EVMC_STATIC_MODE_VIOLATION => StatusCode::StaticModeViolation,
-                evmc_status_code::EVMC_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
-                evmc_status_code::EVMC_CONTRACT_VALIDATION_FAILURE => {
-                    StatusCode::InternalError("ContractValidationFailure".into())
-                }
-                evmc_status_code::EVMC_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
-                evmc_status_code::EVMC_WASM_UNREACHABLE_INSTRUCTION => {
-                    StatusCode::InternalError("WasmUnreachableInstruction".into())
-                }
-                evmc_status_code::EVMC_WASM_TRAP => StatusCode::InternalError("WasmTrap".into()),
-                evmc_status_code::EVMC_INSUFFICIENT_BALANCE => StatusCode::InsufficientBalance,
-                evmc_status_code::EVMC_INTERNAL_ERROR => StatusCode::InternalError(String::new()),
-                evmc_status_code::EVMC_REJECTED => StatusCode::InternalError("Rejected".into()),
-                evmc_status_code::EVMC_OUT_OF_MEMORY => {
-                    StatusCode::InternalError("OutOfMemory".into())
-                }
-            },
+            status_code: execution_result.status_code().into(),
             gas_left: execution_result.gas_left(),
             output_data: execution_result
                 .output()
@@ -209,5 +270,82 @@ impl<'a> Host for ExecutionContext<'a> {
 
     fn access_storage(&mut self, address: Address, key: H256) -> AccessStatus {
         ExecutionContext::access_storage(self, &address.convert(), &key.convert()).into()
+    }
+}
+
+impl From<evmc_vm::Revision> for Revision {
+    fn from(rev: evmc_vm::Revision) -> Self {
+        match rev {
+            evmc_revision::EVMC_FRONTIER => Revision::Frontier,
+            evmc_revision::EVMC_HOMESTEAD => Revision::Homestead,
+            evmc_revision::EVMC_TANGERINE_WHISTLE => Revision::Tangerine,
+            evmc_revision::EVMC_SPURIOUS_DRAGON => Revision::Spurious,
+            evmc_revision::EVMC_BYZANTIUM => Revision::Byzantium,
+            evmc_revision::EVMC_CONSTANTINOPLE => Revision::Constantinople,
+            evmc_revision::EVMC_PETERSBURG => Revision::Petersburg,
+            evmc_revision::EVMC_ISTANBUL => Revision::Istanbul,
+            evmc_revision::EVMC_BERLIN => Revision::Berlin,
+            evmc_revision::EVMC_LONDON => Revision::London,
+            evmc_revision::EVMC_SHANGHAI => Revision::Shanghai,
+        }
+    }
+}
+
+impl From<Revision> for evmc_vm::Revision {
+    fn from(rev: Revision) -> Self {
+        match rev {
+            Revision::Frontier => evmc_revision::EVMC_FRONTIER,
+            Revision::Homestead => evmc_revision::EVMC_HOMESTEAD,
+            Revision::Tangerine => evmc_revision::EVMC_TANGERINE_WHISTLE,
+            Revision::Spurious => evmc_revision::EVMC_SPURIOUS_DRAGON,
+            Revision::Byzantium => evmc_revision::EVMC_BYZANTIUM,
+            Revision::Constantinople => evmc_revision::EVMC_CONSTANTINOPLE,
+            Revision::Petersburg => evmc_revision::EVMC_PETERSBURG,
+            Revision::Istanbul => evmc_revision::EVMC_ISTANBUL,
+            Revision::Berlin => evmc_revision::EVMC_BERLIN,
+            Revision::London => evmc_revision::EVMC_LONDON,
+            Revision::Shanghai => evmc_revision::EVMC_SHANGHAI,
+        }
+    }
+}
+
+#[evmc_declare::evmc_declare_vm("evmodin", "evm", "0.1.0")]
+pub struct EvmOdin;
+
+impl EvmcVm for EvmOdin {
+    fn init() -> Self {
+        Self
+    }
+
+    fn execute<'a>(
+        &self,
+        revision: evmc_vm::Revision,
+        code: &'a [u8],
+        message: &'a ExecutionMessage,
+        context: Option<&'a mut ExecutionContext<'a>>,
+    ) -> ExecutionResult {
+        let code = AnalyzedCode::analyze(code);
+
+        let output = if let Some(context) = context {
+            code.execute(
+                context,
+                NoopTracer,
+                Message::from_evmc(&message),
+                revision.into(),
+            )
+        } else {
+            code.execute(
+                &mut DummyHost,
+                NoopTracer,
+                Message::from_evmc(&message),
+                revision.into(),
+            )
+        };
+
+        ExecutionResult::new(
+            output.status_code.clone().into(),
+            output.gas_left,
+            (!output.output_data.is_empty()).then(|| &*output.output_data),
+        )
     }
 }
