@@ -1,6 +1,4 @@
 use crate::common::{Message, Output};
-use anyhow::bail;
-use async_trait::async_trait;
 use ethereum_types::{Address, H256, U256};
 
 /// State access status (EIP-2929).
@@ -54,130 +52,110 @@ pub struct TxContext {
 }
 
 /// Abstraction that exposes host context to EVM.
-///
-/// It is asynchronous, allowing for remote access. Errors represent network or host errors.
-#[async_trait]
 pub trait Host {
     /// Check if an account exists.
-    async fn account_exists(&self, address: Address) -> anyhow::Result<bool>;
+    fn account_exists(&self, address: Address) -> bool;
     /// Get value of a storage key.
     ///
     /// Returns `Ok(H256::zero())` if does not exist.
-    async fn get_storage(&self, address: Address, key: H256) -> anyhow::Result<H256>;
+    fn get_storage(&self, address: Address, key: H256) -> H256;
     /// Set value of a storage key.
-    async fn set_storage(
-        &mut self,
-        address: Address,
-        key: H256,
-        value: H256,
-    ) -> anyhow::Result<StorageStatus>;
+    fn set_storage(&mut self, address: Address, key: H256, value: H256) -> StorageStatus;
     /// Get balance of an account.
     ///
     /// Returns `Ok(0)` if account does not exist.
-    async fn get_balance(&self, address: Address) -> anyhow::Result<U256>;
+    fn get_balance(&self, address: Address) -> U256;
     /// Get code size of an account.
     ///
     /// Returns `Ok(0)` if account does not exist.
-    async fn get_code_size(&self, address: Address) -> anyhow::Result<U256>;
+    fn get_code_size(&self, address: Address) -> U256;
     /// Get code hash of an account.
     ///
     /// Returns `Ok(0)` if account does not exist.
-    async fn get_code_hash(&self, address: Address) -> anyhow::Result<H256>;
+    fn get_code_hash(&self, address: Address) -> H256;
     /// Copy code of an account.
     ///
     /// Returns `Ok(0)` if offset is invalid.
-    async fn copy_code(
-        &self,
-        address: Address,
-        offset: usize,
-        buffer: &mut [u8],
-    ) -> anyhow::Result<usize>;
+    fn copy_code(&self, address: Address, offset: usize, buffer: &mut [u8]) -> usize;
     /// Self-destruct account.
-    async fn selfdestruct(&mut self, address: Address, beneficiary: Address) -> anyhow::Result<()>;
+    fn selfdestruct(&mut self, address: Address, beneficiary: Address);
     /// Call to another account.
-    async fn call(&mut self, msg: &Message) -> anyhow::Result<Output>;
+    fn call(&mut self, msg: &Message) -> Output;
     /// Retrieve transaction context.
-    async fn get_tx_context(&self) -> anyhow::Result<TxContext>;
+    fn get_tx_context(&self) -> TxContext;
     /// Get block hash.
     ///
     /// Returns `Ok(H256::zero())` if block does not exist.
-    async fn get_block_hash(&self, block_number: u64) -> anyhow::Result<H256>;
+    fn get_block_hash(&self, block_number: u64) -> H256;
     /// Emit a log.
-    async fn emit_log(
-        &mut self,
-        address: Address,
-        data: &[u8],
-        topics: &[H256],
-    ) -> anyhow::Result<()>;
+    fn emit_log(&mut self, address: Address, data: &[u8], topics: &[H256]);
     /// Mark account as warm, return previous access status.
     ///
     /// Returns `Ok(AccessStatus::Cold)` if account does not exist.
-    async fn access_account(&mut self, address: Address) -> anyhow::Result<AccessStatus>;
+    fn access_account(&mut self, address: Address) -> AccessStatus;
     /// Mark storage key as warm, return previous access status.
     ///
     /// Returns `Ok(AccessStatus::Cold)` if account does not exist.
-    async fn access_storage(&mut self, address: Address, key: H256)
-        -> anyhow::Result<AccessStatus>;
+    fn access_storage(&mut self, address: Address, key: H256) -> AccessStatus;
 }
 
 /// Host that does not support any ops.
 pub struct DummyHost;
 
-#[async_trait]
 impl Host for DummyHost {
-    async fn account_exists(&self, _: Address) -> anyhow::Result<bool> {
-        bail!("unsupported")
+    fn account_exists(&self, _: Address) -> bool {
+        todo!()
     }
 
-    async fn get_storage(&self, _: Address, _: H256) -> anyhow::Result<H256> {
-        bail!("unsupported")
+    fn get_storage(&self, _: Address, _: H256) -> H256 {
+        todo!()
     }
 
-    async fn set_storage(&mut self, _: Address, _: H256, _: H256) -> anyhow::Result<StorageStatus> {
-        bail!("unsupported")
+    fn set_storage(&mut self, _: Address, _: H256, _: H256) -> StorageStatus {
+        todo!()
     }
 
-    async fn get_balance(&self, _: Address) -> anyhow::Result<U256> {
-        bail!("unsupported")
+    fn get_balance(&self, _: Address) -> U256 {
+        todo!()
     }
 
-    async fn get_code_size(&self, _: Address) -> anyhow::Result<U256> {
-        bail!("unsupported")
+    fn get_code_size(&self, _: Address) -> U256 {
+        todo!()
     }
 
-    async fn get_code_hash(&self, _: Address) -> anyhow::Result<H256> {
-        bail!("unsupported")
+    fn get_code_hash(&self, _: Address) -> H256 {
+        todo!()
     }
 
-    async fn copy_code(&self, _: Address, _: usize, _: &mut [u8]) -> anyhow::Result<usize> {
-        bail!("unsupported")
+    fn copy_code(&self, _: Address, _: usize, _: &mut [u8]) -> usize {
+        todo!()
     }
 
-    async fn selfdestruct(&mut self, _: Address, _: Address) -> anyhow::Result<()> {
-        bail!("unsupported")
+    fn selfdestruct(&mut self, _: Address, _: Address) {
+        todo!()
     }
 
-    async fn call(&mut self, _: &Message) -> anyhow::Result<Output> {
-        bail!("unsupported")
+    fn call(&mut self, _: &Message) -> Output {
+        todo!()
     }
 
-    async fn get_tx_context(&self) -> anyhow::Result<TxContext> {
-        bail!("unsupported")
+    fn get_tx_context(&self) -> TxContext {
+        todo!()
     }
 
-    async fn get_block_hash(&self, _: u64) -> anyhow::Result<H256> {
-        bail!("unsupported")
+    fn get_block_hash(&self, _: u64) -> H256 {
+        todo!()
     }
 
-    async fn emit_log(&mut self, _: Address, _: &[u8], _: &[H256]) -> anyhow::Result<()> {
-        bail!("unsupported")
+    fn emit_log(&mut self, _: Address, _: &[u8], _: &[H256]) {
+        todo!()
     }
 
-    async fn access_account(&mut self, _: Address) -> anyhow::Result<AccessStatus> {
-        bail!("unsupported")
+    fn access_account(&mut self, _: Address) -> AccessStatus {
+        todo!()
     }
 
-    async fn access_storage(&mut self, _: Address, _: H256) -> anyhow::Result<AccessStatus> {
-        bail!("unsupported")
+    fn access_storage(&mut self, _: Address, _: H256) -> AccessStatus {
+        todo!()
     }
 }

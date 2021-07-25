@@ -6,8 +6,8 @@ use evmodin::{
 };
 use hex_literal::hex;
 
-#[tokio::test]
-async fn code() {
+#[test]
+fn code() {
     // CODESIZE 2 0 CODECOPY RETURN(0,9)
     let code = hex!("38600260003960096000f3");
     EvmTester::new()
@@ -15,11 +15,10 @@ async fn code() {
         .gas_used(23)
         .output_data(&code[2..11])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn codecopy_combinations() {
+#[test]
+fn codecopy_combinations() {
     // The CODECOPY arguments are provided in calldata: first byte is index, second byte is size.
     // The whole copied code is returned.
     let code = Bytecode::new()
@@ -56,12 +55,11 @@ async fn codecopy_combinations() {
             .input(input.to_vec())
             .output_data(output)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn storage() {
+#[test]
+fn storage() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -75,22 +73,20 @@ async fn storage() {
         .gas_left(99776 - 20000)
         .output_data(hex!("ff"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn sstore_pop_stack() {
+#[test]
+fn sstore_pop_stack() {
     EvmTester::new()
         .code(hex!("60008060015560005360016000f3"))
         .gas(100000)
         .status(StatusCode::Success)
         .output_data(hex!("00"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn sload_cost_pre_tangerine_whistle() {
+#[test]
+fn sload_cost_pre_tangerine_whistle() {
     EvmTester::new()
         .code(hex!("60008054"))
         .revision(Revision::Homestead)
@@ -104,11 +100,10 @@ async fn sload_cost_pre_tangerine_whistle() {
             assert_eq!(host.accounts[&message.destination].storage.len(), 0);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn sstore_out_of_block_gas() {
+#[test]
+fn sstore_out_of_block_gas() {
     for (gas, status) in [
         // Barely enough gas to execute successfully.
         (20011, StatusCode::Success),
@@ -124,12 +119,11 @@ async fn sstore_out_of_block_gas() {
             .gas(gas)
             .status(status)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn sstore_cost() {
+#[test]
+fn sstore_cost() {
     for revision in [
         Revision::Byzantium,
         Revision::Constantinople,
@@ -156,8 +150,7 @@ async fn sstore_cost() {
             .code(Bytecode::new().sstore(1, 1))
             .gas_used(20006)
             .status(StatusCode::Success)
-            .check()
-            .await;
+            .check();
 
         // Deleted:
         t.clone()
@@ -167,8 +160,7 @@ async fn sstore_cost() {
             })
             .gas_used(5006)
             .status(StatusCode::Success)
-            .check()
-            .await;
+            .check();
 
         // Modified:
         t.clone()
@@ -178,8 +170,7 @@ async fn sstore_cost() {
             })
             .gas_used(5006)
             .status(StatusCode::Success)
-            .check()
-            .await;
+            .check();
 
         // Unchanged:
         t.clone()
@@ -193,8 +184,7 @@ async fn sstore_cost() {
                 _ => 5006,
             })
             .status(StatusCode::Success)
-            .check()
-            .await;
+            .check();
 
         // Added & unchanged:
         t.clone()
@@ -205,8 +195,7 @@ async fn sstore_cost() {
                 _ => 25012,
             })
             .status(StatusCode::Success)
-            .check()
-            .await;
+            .check();
 
         // Modified again:
         t.clone()
@@ -222,8 +211,7 @@ async fn sstore_cost() {
                 Revision::Constantinople => 206,
                 _ => 5006,
             })
-            .check()
-            .await;
+            .check();
 
         // Added & modified again:
         t.clone()
@@ -234,8 +222,7 @@ async fn sstore_cost() {
                 Revision::Constantinople => 20212,
                 _ => 25012,
             })
-            .check()
-            .await;
+            .check();
 
         // Modified & modified again:
         t.clone()
@@ -249,8 +236,7 @@ async fn sstore_cost() {
                 Revision::Constantinople => 5212,
                 _ => 10012,
             })
-            .check()
-            .await;
+            .check();
 
         // Modified & modified again back to original:t.clone()
         t.clone()
@@ -264,13 +250,12 @@ async fn sstore_cost() {
                 Revision::Constantinople => 5212,
                 _ => 10012,
             })
-            .check()
-            .await;
+            .check();
     }
 }
 
-#[tokio::test]
-async fn sstore_below_stipend() {
+#[test]
+fn sstore_below_stipend() {
     let code = Bytecode::new().sstore(0, 0);
 
     let t = EvmTester::new().code(code);
@@ -285,19 +270,16 @@ async fn sstore_below_stipend() {
             .gas(2306)
             .status(status)
             .check()
-            .await
     }
 
-    t.clone()
-        .revision(Revision::Constantinople)
+    t.revision(Revision::Constantinople)
         .gas(2307)
         .status(StatusCode::Success)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn tx_context() {
+#[test]
+fn tx_context() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -346,11 +328,10 @@ async fn tx_context() {
             assert_eq!(output_data[1], 0xdd);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn balance() {
+#[test]
+fn balance() {
     EvmTester::new()
         .apply_host_fn(|host, msg| {
             host.accounts.entry(msg.destination).or_default().balance = 0x0504030201_u64.into()
@@ -366,11 +347,10 @@ async fn balance() {
         .status(StatusCode::Success)
         .output_data(hex!("000504030201"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn account_info_homestead() {
+#[test]
+fn account_info_homestead() {
     let t = EvmTester::new()
         .revision(Revision::Homestead)
         .apply_host_fn(|host, msg| {
@@ -389,8 +369,7 @@ async fn account_info_homestead() {
         .status(StatusCode::Success)
         .gas_used(37)
         .output_value(1)
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .code(
@@ -402,28 +381,25 @@ async fn account_info_homestead() {
         .status(StatusCode::Success)
         .gas_used(37)
         .output_value(1)
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .code(
-            Bytecode::new()
-                .pushv(1)
-                .pushv(0)
-                .pushv(0)
-                .opcode(OpCode::ADDRESS)
-                .opcode(OpCode::EXTCODECOPY)
-                .ret(0, 1),
-        )
-        .status(StatusCode::Success)
-        .gas_used(43)
-        .output_data([1])
-        .check()
-        .await
+    t.code(
+        Bytecode::new()
+            .pushv(1)
+            .pushv(0)
+            .pushv(0)
+            .opcode(OpCode::ADDRESS)
+            .opcode(OpCode::EXTCODECOPY)
+            .ret(0, 1),
+    )
+    .status(StatusCode::Success)
+    .gas_used(43)
+    .output_data([1])
+    .check()
 }
 
-#[tokio::test]
-async fn selfbalance() {
+#[test]
+fn selfbalance() {
     let t = EvmTester::new()
         .apply_host_fn(|host, msg| {
             host.accounts.entry(msg.destination).or_default().balance = 0x0504030201_u64.into();
@@ -441,20 +417,17 @@ async fn selfbalance() {
     t.clone()
         .revision(Revision::Constantinople)
         .status(StatusCode::UndefinedInstruction)
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .revision(Revision::Istanbul)
+    t.revision(Revision::Istanbul)
         .status(StatusCode::Success)
         .gas_used(23)
         .output_data(hex!("000504030201"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn log() {
+#[test]
+fn log() {
     for op in [
         OpCode::LOG0,
         OpCode::LOG1,
@@ -489,12 +462,11 @@ async fn log() {
                 }
             })
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn log0_empty() {
+#[test]
+fn log0_empty() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -510,11 +482,10 @@ async fn log0_empty() {
             assert_eq!(last_log.data.len(), 0);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn log_data_cost() {
+#[test]
+fn log_data_cost() {
     for op in [
         OpCode::LOG0,
         OpCode::LOG1,
@@ -539,12 +510,11 @@ async fn log_data_cost() {
                 assert_eq!(host.recorded.lock().logs.len(), 1);
             })
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn selfdestruct() {
+#[test]
+fn selfdestruct() {
     EvmTester::new()
         .code(hex!("6009ff"))
         .revision(Revision::Spurious)
@@ -562,8 +532,7 @@ async fn selfdestruct() {
                 9
             );
         })
-        .check()
-        .await;
+        .check();
 
     EvmTester::new()
         .code(hex!("6007ff"))
@@ -582,8 +551,7 @@ async fn selfdestruct() {
                 7
             );
         })
-        .check()
-        .await;
+        .check();
 
     EvmTester::new()
         .code(hex!("6008ff"))
@@ -602,12 +570,11 @@ async fn selfdestruct() {
                 8
             );
         })
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn selfdestruct_with_balance() {
+#[test]
+fn selfdestruct_with_balance() {
     let beneficiary = Address::zero();
     let code = Bytecode::new()
         .pushb(beneficiary.0)
@@ -629,8 +596,7 @@ async fn selfdestruct_with_balance() {
 
             assert_eq!(r.account_accesses, [msg.destination]); // Selfdestruct.
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -647,8 +613,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -663,8 +628,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -681,8 +645,7 @@ async fn selfdestruct_with_balance() {
                 ]
             )
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -691,8 +654,7 @@ async fn selfdestruct_with_balance() {
         .inspect_host(|host, _| {
             assert_eq!(host.recorded.lock().account_accesses, []);
         })
-        .check()
-        .await;
+        .check();
 
     t = t.apply_host_fn(move |host, msg| {
         host.accounts.entry(msg.destination).or_default().balance = 1.into();
@@ -711,8 +673,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -729,8 +690,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -745,8 +705,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -765,8 +724,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -783,8 +741,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t = t.apply_host_fn(move |host, msg| {
         host.accounts.entry(beneficiary).or_default(); // Beneficiary exists.
@@ -804,8 +761,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -822,8 +778,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -832,8 +787,7 @@ async fn selfdestruct_with_balance() {
         .inspect_host(move |host, _| {
             assert_eq!(host.recorded.lock().account_accesses, []);
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -850,8 +804,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -860,8 +813,7 @@ async fn selfdestruct_with_balance() {
         .inspect_host(|host, _| {
             assert_eq!(host.recorded.lock().account_accesses, []);
         })
-        .check()
-        .await;
+        .check();
 
     t = t.apply_host_fn(|host, msg| {
         host.accounts.entry(msg.destination).or_default().balance = 1.into();
@@ -880,8 +832,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -898,8 +849,7 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -908,8 +858,7 @@ async fn selfdestruct_with_balance() {
         .inspect_host(|host, _| {
             assert_eq!(host.recorded.lock().account_accesses, []);
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -928,22 +877,19 @@ async fn selfdestruct_with_balance() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .revision(Revision::Spurious)
+    t.revision(Revision::Spurious)
         .gas(5002)
         .status(StatusCode::OutOfGas)
         .inspect_host(|host, _| {
             assert_eq!(host.recorded.lock().account_accesses, []);
         })
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn blockhash() {
+#[test]
+fn blockhash() {
     let t = EvmTester::new()
         .code(hex!("60004060005260206000f3"))
         .status(StatusCode::Success)
@@ -963,8 +909,7 @@ async fn blockhash() {
         .inspect_host(|host, _| {
             assert_eq!(host.recorded.lock().blockhashes, [] as [u64; 0]);
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .apply_host_fn(|host, _| {
@@ -977,26 +922,23 @@ async fn blockhash() {
         .inspect_host(|host, _| {
             assert_eq!(host.recorded.lock().blockhashes, [] as [u64; 0]);
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .apply_host_fn(|host, _| {
-            host.tx_context.block_number = 256;
-        })
-        .inspect_output(|output| {
-            assert_eq!(output.len(), 32);
-            assert_eq!(output[13], 0x13);
-        })
-        .inspect_host(|host, _| {
-            assert_eq!(host.recorded.lock().blockhashes, [0]);
-        })
-        .check()
-        .await;
+    t.apply_host_fn(|host, _| {
+        host.tx_context.block_number = 256;
+    })
+    .inspect_output(|output| {
+        assert_eq!(output.len(), 32);
+        assert_eq!(output[13], 0x13);
+    })
+    .inspect_host(|host, _| {
+        assert_eq!(host.recorded.lock().blockhashes, [0]);
+    })
+    .check();
 }
 
-#[tokio::test]
-async fn extcode() {
+#[test]
+fn extcode() {
     let addr = hex!("fffffffffffffffffffffffffffffffffffffffe").into();
 
     EvmTester::new()
@@ -1020,11 +962,10 @@ async fn extcode() {
             assert_eq!(host.recorded.lock().account_accesses[1].0[19], 0xfe);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodesize() {
+#[test]
+fn extcodesize() {
     EvmTester::new()
         .apply_host_fn(|host, _| {
             host.accounts
@@ -1040,11 +981,10 @@ async fn extcodesize() {
         )
         .output_value(1)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodecopy_big_index() {
+#[test]
+fn extcodecopy_big_index() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -1059,11 +999,10 @@ async fn extcodecopy_big_index() {
         )
         .output_data(hex!("00"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodehash() {
+#[test]
+fn extcodehash() {
     let t = EvmTester::new()
         .apply_host_fn(|host, _| {
             host.accounts.entry(Address::zero()).or_default().code_hash =
@@ -1074,22 +1013,19 @@ async fn extcodehash() {
     t.clone()
         .revision(Revision::Byzantium)
         .status(StatusCode::UndefinedInstruction)
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .revision(Revision::Constantinople)
+    t.revision(Revision::Constantinople)
         .status(StatusCode::Success)
         .gas_used(418)
         .inspect(|host, _, output| {
             assert_eq!(output, host.accounts[&Address::zero()].code_hash.0);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn codecopy_empty() {
+#[test]
+fn codecopy_empty() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -1103,11 +1039,10 @@ async fn codecopy_empty() {
         .status(StatusCode::Success)
         .output_value(0)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodecopy_empty() {
+#[test]
+fn extcodecopy_empty() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -1122,11 +1057,10 @@ async fn extcodecopy_empty() {
         .status(StatusCode::Success)
         .output_value(0)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn codecopy_memory_cost() {
+#[test]
+fn codecopy_memory_cost() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -1138,11 +1072,10 @@ async fn codecopy_memory_cost() {
         .status(StatusCode::Success)
         .gas_used(18)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodecopy_memory_cost() {
+#[test]
+fn extcodecopy_memory_cost() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -1154,11 +1087,10 @@ async fn extcodecopy_memory_cost() {
         )
         .gas_used(718)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodecopy_nonzero_index() {
+#[test]
+fn extcodecopy_nonzero_index() {
     let index = 15;
     let code = Bytecode::new()
         .pushv(2)
@@ -1189,11 +1121,10 @@ async fn extcodecopy_nonzero_index() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodecopy_fill_tail() {
+#[test]
+fn extcodecopy_fill_tail() {
     EvmTester::new()
         .apply_host_fn(|host, _| {
             let mut addr = Address::zero();
@@ -1218,11 +1149,10 @@ async fn extcodecopy_fill_tail() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn extcodecopy_buffer_overflow() {
+#[test]
+fn extcodecopy_buffer_overflow() {
     let code = Bytecode::new()
         .opcode(OpCode::NUMBER)
         .opcode(OpCode::TIMESTAMP)
@@ -1255,8 +1185,7 @@ async fn extcodecopy_buffer_overflow() {
                 .inspect_output(move |output| {
                     assert_eq!(output.len(), size);
                 })
-                .check()
-                .await;
+                .check();
         }
     }
 }

@@ -1,5 +1,6 @@
-use super::*;
+use crate::state::ExecutionState;
 use crate::{interpreter::JumpdestMap, StatusCode};
+use ethereum_types::U256;
 
 pub(crate) fn ret(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let offset = *state.stack.get(0);

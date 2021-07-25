@@ -4,8 +4,8 @@ use ethereum_types::{Address, H256, U256};
 use evmodin::{opcode::*, util::*, *};
 use hex_literal::hex;
 
-#[tokio::test]
-async fn delegatecall() {
+#[test]
+fn delegatecall() {
     let mut value = H256::zero();
     value.0[17] = 0xfe;
 
@@ -37,12 +37,11 @@ async fn delegatecall() {
             assert_eq!(<[u8; 32]>::from(call_msg.value)[17], 0xfe);
         })
         .check()
-        .await
 }
 
 /// Checks if DELEGATECALL forwards the "static" flag.
-#[tokio::test]
-async fn delegatecall_static() {
+#[test]
+fn delegatecall_static() {
     EvmTester::new()
         .set_static(true)
         .code(Bytecode::new().append_bc(CallInstruction::delegatecall(0).gas(1)))
@@ -57,11 +56,10 @@ async fn delegatecall_static() {
             assert!(call_msg.is_static);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn delegatecall_oog_depth_limit() {
+#[test]
+fn delegatecall_oog_depth_limit() {
     let t = EvmTester::new()
         .revision(Revision::Homestead)
         .depth(1024)
@@ -75,14 +73,13 @@ async fn delegatecall_oog_depth_limit() {
         .status(StatusCode::Success)
         .gas_used(73)
         .output_value(0)
-        .check()
-        .await;
+        .check();
 
-    t.clone().gas(73).status(StatusCode::OutOfGas).check().await;
+    t.gas(73).status(StatusCode::OutOfGas).check();
 }
 
-#[tokio::test]
-async fn create() {
+#[test]
+fn create() {
     let address = Address::zero();
 
     EvmTester::new()
@@ -110,11 +107,10 @@ async fn create() {
             assert_eq!(r.calls.last().unwrap().input_data.len(), 0x20);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn create_gas() {
+#[test]
+fn create_gas() {
     for rev in [Revision::Homestead, Revision::Tangerine] {
         EvmTester::new()
             .revision(rev)
@@ -139,12 +135,11 @@ async fn create_gas() {
                 );
             })
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn create2() {
+#[test]
+fn create2() {
     let address = Address::zero();
     EvmTester::new()
         .revision(Revision::Constantinople)
@@ -186,11 +181,10 @@ async fn create2() {
             assert_eq!(call_msg.input_data.len(), 0x41);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn create2_salt_cost() {
+#[test]
+fn create2_salt_cost() {
     let t = EvmTester::new()
         .revision(Revision::Constantinople)
         .code(hex!("600060208180f5"));
@@ -209,11 +203,9 @@ async fn create2_salt_cost() {
             );
             assert_eq!(r.calls.last().unwrap().depth, 1);
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .gas(32021 - 1)
+    t.gas(32021 - 1)
         .status(StatusCode::OutOfGas)
         .gas_left(0)
         .inspect_host(|host, _| {
@@ -221,11 +213,10 @@ async fn create2_salt_cost() {
             assert_eq!(host.recorded.lock().calls.len(), 0)
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn create_balance_too_low() {
+#[test]
+fn create_balance_too_low() {
     for op in [OpCode::CREATE, OpCode::CREATE2] {
         EvmTester::new()
             .revision(Revision::Constantinople)
@@ -247,12 +238,11 @@ async fn create_balance_too_low() {
                 assert_eq!(host.recorded.lock().calls, []);
             })
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn create_failure() {
+#[test]
+fn create_failure() {
     for op in [OpCode::CREATE, OpCode::CREATE2] {
         let mut create_address = Address::zero();
         create_address.0[19] = 0xce;
@@ -290,8 +280,7 @@ async fn create_failure() {
                     }
                 );
             })
-            .check()
-            .await;
+            .check();
 
         t.clone()
             .apply_host_fn(|host, _| {
@@ -312,8 +301,7 @@ async fn create_failure() {
                     }
                 );
             })
-            .check()
-            .await;
+            .check();
 
         t.clone()
             .apply_host_fn(|host, _| {
@@ -334,13 +322,12 @@ async fn create_failure() {
                     }
                 );
             })
-            .check()
-            .await;
+            .check();
     }
 }
 
-#[tokio::test]
-async fn call_failing_with_value() {
+#[test]
+fn call_failing_with_value() {
     for op in [OpCode::CALL, OpCode::CALLCODE] {
         let t = EvmTester::new()
             .apply_host_fn(|host, _| {
@@ -370,8 +357,7 @@ async fn call_failing_with_value() {
                 // There was no call().
                 assert_eq!(host.recorded.lock().calls, []);
             })
-            .check()
-            .await;
+            .check();
 
         // Fails on value transfer additional cost - minimum gas limit that triggers this condition.
         t.clone()
@@ -381,8 +367,7 @@ async fn call_failing_with_value() {
                 // There was no call().
                 assert_eq!(host.recorded.lock().calls, []);
             })
-            .check()
-            .await;
+            .check();
 
         // Fails on value transfer additional cost - maximum gas limit that triggers this condition.
         t.clone()
@@ -392,13 +377,12 @@ async fn call_failing_with_value() {
                 // There was no call().
                 assert_eq!(host.recorded.lock().calls, []);
             })
-            .check()
-            .await;
+            .check();
     }
 }
 
-#[tokio::test]
-async fn call_with_value() {
+#[test]
+fn call_with_value() {
     let call_sender = hex!("5e4d00000000000000000000000000000000d4e5").into();
     let call_dst = hex!("00000000000000000000000000000000000000aa").into();
 
@@ -429,11 +413,10 @@ async fn call_with_value() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn call_with_value_depth_limit() {
+#[test]
+fn call_with_value_depth_limit() {
     let mut call_dst = Address::zero();
     call_dst.0[19] = 0xaa;
 
@@ -449,11 +432,10 @@ async fn call_with_value_depth_limit() {
             assert_eq!(host.recorded.lock().calls, []);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn call_depth_limit() {
+#[test]
+fn call_depth_limit() {
     for op in [
         OpCode::CALL,
         OpCode::CALLCODE,
@@ -484,12 +466,11 @@ async fn call_depth_limit() {
             })
             .output_value(0)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn call_output() {
+#[test]
+fn call_output() {
     for op in [
         OpCode::CALL,
         OpCode::CALLCODE,
@@ -543,8 +524,7 @@ async fn call_output() {
             )
             .status(StatusCode::Success)
             .output_data(hex!("000a00"))
-            .check()
-            .await;
+            .check();
 
         t.clone()
             .code(
@@ -555,13 +535,12 @@ async fn call_output() {
             )
             .status(StatusCode::Success)
             .output_data(hex!("000000"))
-            .check()
-            .await;
+            .check();
     }
 }
 
-#[tokio::test]
-async fn call_high_gas() {
+#[test]
+fn call_high_gas() {
     for call_opcode in [OpCode::CALL, OpCode::CALLCODE, OpCode::DELEGATECALL] {
         let mut call_dst = Address::zero();
         call_dst.0[19] = 0xaa;
@@ -585,12 +564,11 @@ async fn call_high_gas() {
             )
             .status(StatusCode::OutOfGas)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn call_value_zero_to_nonexistent_account() {
+#[test]
+fn call_value_zero_to_nonexistent_account() {
     let call_gas = 6000;
 
     let gas_left = 1000;
@@ -630,11 +608,10 @@ async fn call_value_zero_to_nonexistent_account() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn call_new_account_creation_cost() {
+#[test]
+fn call_new_account_creation_cost() {
     let call_dst: Address = hex!("00000000000000000000000000000000000000ad").into();
     let destination: Address = hex!("0000000000000000000000000000000000000003").into();
 
@@ -672,8 +649,7 @@ async fn call_new_account_creation_cost() {
                 ]
             );
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Tangerine)
@@ -707,8 +683,7 @@ async fn call_new_account_creation_cost() {
                 ]
             )
         })
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .revision(Revision::Spurious)
@@ -740,11 +715,9 @@ async fn call_new_account_creation_cost() {
             ]
             )
         })
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .revision(Revision::Spurious)
+    t.revision(Revision::Spurious)
         .apply_host_fn(|host, msg| {
             host.accounts.entry(msg.destination).or_default().balance = 1.into();
         })
@@ -776,11 +749,10 @@ async fn call_new_account_creation_cost() {
             )
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn callcode_new_account_create() {
+#[test]
+fn callcode_new_account_create() {
     let code = hex!("60008080806001600061c350f250");
     let call_sender = hex!("5e4d00000000000000000000000000000000d4e5").into();
 
@@ -810,12 +782,11 @@ async fn callcode_new_account_create() {
             );
         })
         .check()
-        .await
 }
 
 /// Performs a CALL then OOG in the same code block.
-#[tokio::test]
-async fn call_then_oog() {
+#[test]
+fn call_then_oog() {
     let call_dst = 0xaa;
 
     let mut code = Bytecode::new().append_bc(
@@ -851,12 +822,11 @@ async fn call_then_oog() {
             assert_eq!(host.recorded.lock().calls[0].gas, 254);
         })
         .check()
-        .await
 }
 
 /// Performs a CALLCODE then OOG in the same code block.
-#[tokio::test]
-async fn callcode_then_oog() {
+#[test]
+fn callcode_then_oog() {
     let call_dst = 0xaa;
 
     let mut code = Bytecode::new().append_bc(
@@ -890,12 +860,11 @@ async fn callcode_then_oog() {
             assert_eq!(host.recorded.lock().calls[0].gas, 100);
         })
         .check()
-        .await
 }
 
 /// Performs a CALL then OOG in the same code block.
-#[tokio::test]
-async fn delegatecall_then_oog() {
+#[test]
+fn delegatecall_then_oog() {
     let call_dst = 0xaa;
 
     let mut code = Bytecode::new().append_bc(
@@ -930,12 +899,11 @@ async fn delegatecall_then_oog() {
             assert_eq!(host.recorded.lock().calls[0].gas, 254);
         })
         .check()
-        .await
 }
 
 /// Performs a STATICCALL then OOG in the same code block.
-#[tokio::test]
-async fn staticcall_then_oog() {
+#[test]
+fn staticcall_then_oog() {
     let call_dst = 0xaa;
 
     let mut code = Bytecode::new().append_bc(
@@ -970,11 +938,10 @@ async fn staticcall_then_oog() {
             assert_eq!(host.recorded.lock().calls[0].gas, 254);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn staticcall_input() {
+#[test]
+fn staticcall_input() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -989,11 +956,10 @@ async fn staticcall_input() {
             assert_eq!(r.calls[0].input_data[..], hex!("010203"));
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn call_with_value_low_gas() {
+#[test]
+fn call_with_value_low_gas() {
     for op in [OpCode::CALL, OpCode::CALLCODE] {
         EvmTester::new()
             .apply_host_fn(|host, _| {
@@ -1016,12 +982,11 @@ async fn call_with_value_low_gas() {
             .status(StatusCode::Success)
             .gas_left(2300 - 2)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn call_oog_after_balance_check() {
+#[test]
+fn call_oog_after_balance_check() {
     // Create the call destination account.
     for op in [OpCode::CALL, OpCode::CALLCODE] {
         EvmTester::new()
@@ -1044,12 +1009,11 @@ async fn call_oog_after_balance_check() {
             .gas(12420)
             .status(StatusCode::OutOfGas)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn call_oog_after_depth_check() {
+#[test]
+fn call_oog_after_depth_check() {
     // Create the call destination account.
     let t = EvmTester::new()
         .apply_host_fn(|host, _| {
@@ -1074,10 +1038,9 @@ async fn call_oog_after_depth_check() {
             .gas(12420)
             .status(StatusCode::OutOfGas)
             .check()
-            .await
     }
 
-    let t = t.clone().revision(Revision::Tangerine).code(
+    let t = t.revision(Revision::Tangerine).code(
         Bytecode::new()
             .pushv(0)
             .pushv(0)
@@ -1090,21 +1053,13 @@ async fn call_oog_after_depth_check() {
             .opcode(OpCode::SELFDESTRUCT),
     );
 
-    t.clone()
-        .gas(721)
-        .status(StatusCode::OutOfGas)
-        .check()
-        .await;
+    t.clone().gas(721).status(StatusCode::OutOfGas).check();
 
-    t.clone()
-        .gas(721 + 5000 - 1)
-        .status(StatusCode::OutOfGas)
-        .check()
-        .await;
+    t.gas(721 + 5000 - 1).status(StatusCode::OutOfGas).check();
 }
 
-#[tokio::test]
-async fn create_oog_after() {
+#[test]
+fn create_oog_after() {
     for op in [OpCode::CREATE, OpCode::CREATE2] {
         EvmTester::new()
             .revision(Revision::Constantinople)
@@ -1120,22 +1075,20 @@ async fn create_oog_after() {
             .gas(39000)
             .status(StatusCode::OutOfGas)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn returndatasize_before_call() {
+#[test]
+fn returndatasize_before_call() {
     EvmTester::new()
         .code(hex!("3d60005360016000f3"))
         .gas_used(17)
         .output_data([0])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn returndatasize() {
+#[test]
+fn returndatasize() {
     let call_res_output_len = 13;
 
     let t = EvmTester::new()
@@ -1164,8 +1117,7 @@ async fn returndatasize() {
     t.clone()
         .gas_used(735)
         .output_data([call_res_output_len])
-        .check()
-        .await;
+        .check();
 
     t.clone()
         .apply_host_fn(|host, _| {
@@ -1174,22 +1126,19 @@ async fn returndatasize() {
         })
         .gas_used(735)
         .output_data([1])
-        .check()
-        .await;
+        .check();
 
-    t.clone()
-        .apply_host_fn(|host, _| {
-            host.call_result.output_data = Bytes::new();
-            host.call_result.status_code = StatusCode::InternalError(String::new());
-        })
-        .gas_used(735)
-        .output_data([0])
-        .check()
-        .await;
+    t.apply_host_fn(|host, _| {
+        host.call_result.output_data = Bytes::new();
+        host.call_result.status_code = StatusCode::InternalError(String::new());
+    })
+    .gas_used(735)
+    .output_data([0])
+    .check();
 }
 
-#[tokio::test]
-async fn returndatacopy() {
+#[test]
+fn returndatacopy() {
     let call_output = hex!("0102030405060700000000000000000000000000000000000000000000000000");
 
     EvmTester::new()
@@ -1200,36 +1149,30 @@ async fn returndatacopy() {
         .gas_used(999)
         .output_data(call_output)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn returndatacopy_empty() {
+#[test]
+fn returndatacopy_empty() {
     EvmTester::new()
         .code(hex!("600080808060aa60fff4600080803e60016000f3"))
         .gas_used(994)
         .output_data([0])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn returndatacopy_cost() {
+#[test]
+fn returndatacopy_cost() {
     let t = EvmTester::new()
         .code(hex!("60008080808080fa6001600060003e"))
         .apply_host_fn(|host, _| {
             host.call_result.output_data = vec![0].into();
         });
-    t.clone().gas(736).status(StatusCode::Success).check().await;
-    t.clone()
-        .gas(735)
-        .status(StatusCode::OutOfGas)
-        .check()
-        .await;
+    t.clone().gas(736).status(StatusCode::Success).check();
+    t.gas(735).status(StatusCode::OutOfGas).check();
 }
 
-#[tokio::test]
-async fn returndatacopy_outofrange() {
+#[test]
+fn returndatacopy_outofrange() {
     for code in [
         hex!("60008080808080fa6002600060003e"),
         hex!("60008080808080fa6001600160003e"),
@@ -1243,6 +1186,5 @@ async fn returndatacopy_outofrange() {
             .gas(735)
             .status(StatusCode::InvalidMemoryAccess)
             .check()
-            .await
     }
 }

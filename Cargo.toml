@@ -7,11 +7,16 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = { version = "1", default-features = false }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
-async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false, features = ["serde"] }
-educe = { version = "0.4", default-features = false, optional = true }
+derive_more = "0.99"
+educe = { version = "0.4", default-features = false, features = ["Debug"] }
+enum-as-inner = "0.3"
+evmc-declare = { git = "https://github.com/ethereum/evmc", optional = true }
+evmc-vm = { git = "https://github.com/ethereum/evmc", optional = true }
 i256 = { git = "https://github.com/vorot93/rust-i256" }
 ethereum-types = { version = "0.12", default-features = false }
+genawaiter = { git = "https://github.com/cuviper/genawaiter", branch = "unhacked" }
+getset = "0.1"
 hex = "0.4"
 hex-literal = { version = "0.3", optional = true }
 num-traits = { version = "0.2", default-features = false }
@@ -29,7 +34,7 @@ strum_macros = "0.21"
 evmodin-test = { path = ".", package = "evmodin", features = ["util"] }
 hex-literal = "0.3"
 rand = { version = "0.8", features = ["std"] }
-tokio = { version = "1", features = ["full"] }
 
 [features]
-util = ["educe/Debug", "hex-literal", "parking_lot"]
+evmc = ["evmc-declare", "evmc-vm"]
+util = ["hex-literal", "parking_lot"]

@@ -1,8 +1,7 @@
-//! Fast EVM implementation with full async support. Port of [evmone](https://github.com/ethereum/evmone) to Rust.
+//! Fast EVM implementation with support for resumability. Port of [evmone](https://github.com/ethereum/evmone) to Rust.
 //!
 //! # Usage
 //! ```
-//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! use evmodin::{*, host::*, util::*, tracing::*};
 //! use ethereum_types::*;
 //! use hex_literal::hex;
@@ -29,8 +28,7 @@
 //!
 //! assert_eq!(
 //!     AnalyzedCode::analyze(my_code)
-//!         .execute(&mut DummyHost, &mut NoopTracer, message, Revision::London)
-//!         .await,
+//!         .execute(&mut DummyHost, NoopTracer, None, message, Revision::latest()),
 //!     Output {
 //!         status_code: StatusCode::Success,
 //!         gas_left: 146,
@@ -38,13 +36,13 @@
 //!         create_address: None,
 //!     }
 //! )
-//! # })
 //! ```
 use bytes::Bytes;
-pub use common::{CallKind, Message, Output, Revision, StatusCode};
+pub use common::{CallKind, Message, Output, Revision, StatusCode, SuccessfulOutput};
 pub use host::Host;
 pub use interpreter::AnalyzedCode;
 pub use opcode::OpCode;
+pub use state::{ExecutionState, Stack};
 
 mod common;
 pub mod host;
@@ -55,5 +53,9 @@ pub mod opcode;
 mod state;
 pub mod tracing;
 
+pub mod continuation;
 #[cfg(feature = "util")]
 pub mod util;
+
+#[cfg(feature = "evmc")]
+pub mod evmc;

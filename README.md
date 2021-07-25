@@ -1,6 +1,6 @@
 # evmodin
 
-Fast EVM implementation with full async support. Port of [evmone](https://github.com/ethereum/evmone) to Rust.
+Fast EVM implementation with support for resumability. Port of [evmone](https://github.com/ethereum/evmone) to Rust.
 
 ## Usage
 ```rust
@@ -30,8 +30,7 @@ let message = Message {
 
 assert_eq!(
     AnalyzedCode::analyze(my_code)
-        .execute(&mut DummyHost, &mut NoopTracer, message, Revision::London)
-        .await,
+        .execute(&mut DummyHost, NoopTracer, None, message, Revision::latest()),
     Output {
         status_code: StatusCode::Success,
         gas_left: 146,

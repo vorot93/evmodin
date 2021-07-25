@@ -6,8 +6,8 @@ use evmodin::{opcode::*, util::*, *};
 use hex_literal::hex;
 use std::cmp::max;
 
-#[tokio::test]
-async fn empty_code() {
+#[test]
+fn empty_code() {
     for gas in [0, 1] {
         EvmTester::new()
             .code(hex!(""))
@@ -15,21 +15,19 @@ async fn empty_code() {
             .gas_used(0)
             .status(StatusCode::Success)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn invalid_push() {
+#[test]
+fn invalid_push() {
     EvmTester::new()
         .code(Bytecode::new().opcode(OpCode::PUSH1))
         .status(StatusCode::Success)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn push_and_pop() {
+#[test]
+fn push_and_pop() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -42,11 +40,10 @@ async fn push_and_pop() {
         .gas_used(10)
         .status(StatusCode::Success)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn stack_underflow() {
+#[test]
+fn stack_underflow() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -58,18 +55,16 @@ async fn stack_underflow() {
         )
         .gas(13)
         .status(StatusCode::StackUnderflow)
-        .check()
-        .await;
+        .check();
 
     EvmTester::new()
         .code(Bytecode::new().opcode(OpCode::NOT))
         .status(StatusCode::StackUnderflow)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn add() {
+#[test]
+fn add() {
     EvmTester::new()
         .code(hex!("6007600d0160005260206000f3"))
         .gas(25)
@@ -77,11 +72,10 @@ async fn add() {
         .status(StatusCode::Success)
         .output_value(20)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn dup() {
+#[test]
+fn dup() {
     // 0 7 3 5
     // 0 7 3 5 3 5
     // 0 7 3 5 3 5 5 7
@@ -94,11 +88,10 @@ async fn dup() {
         .status(StatusCode::Success)
         .output_value(20)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn dup_all_1() {
+#[test]
+fn dup_all_1() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -110,11 +103,10 @@ async fn dup_all_1() {
         .status(StatusCode::Success)
         .output_value(17)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn dup_stack_overflow() {
+#[test]
+fn dup_stack_overflow() {
     let b = Bytecode::new()
         .pushv(1)
         .append(hex!("808182838485868788898a8b8c8d8e8f"))
@@ -123,18 +115,16 @@ async fn dup_stack_overflow() {
     EvmTester::new()
         .code(b.clone())
         .status(StatusCode::Success)
-        .check()
-        .await;
+        .check();
 
     EvmTester::new()
         .code(b.append([0x8f]))
         .status(StatusCode::StackOverflow)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn dup_stack_underflow() {
+#[test]
+fn dup_stack_underflow() {
     for i in 0..16 {
         EvmTester::new()
             .code(
@@ -145,12 +135,11 @@ async fn dup_stack_underflow() {
             )
             .status(StatusCode::StackUnderflow)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn sub_and_swap() {
+#[test]
+fn sub_and_swap() {
     EvmTester::new()
         .code(hex!("600180810380829052602090f3"))
         .gas(33)
@@ -158,11 +147,10 @@ async fn sub_and_swap() {
         .gas_left(0)
         .output_value(1)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn memory_and_not() {
+#[test]
+fn memory_and_not() {
     EvmTester::new()
         .code(hex!("600060018019815381518252800190f3"))
         .gas(42)
@@ -170,11 +158,10 @@ async fn memory_and_not() {
         .gas_left(0)
         .output_data(hex!("00fe"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn msize() {
+#[test]
+fn msize() {
     EvmTester::new()
         .code(hex!("60aa6022535960005360016000f3"))
         .gas(29)
@@ -182,11 +169,10 @@ async fn msize() {
         .gas_left(0)
         .output_data(hex!("40"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn gas() {
+#[test]
+fn gas() {
     EvmTester::new()
         .code(hex!("5a5a5a010160005360016000f3"))
         .gas(40)
@@ -194,11 +180,10 @@ async fn gas() {
         .gas_left(13)
         .output_data([38 + 36 + 34])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn arith() {
+#[test]
+fn arith() {
     // x = (0 - 1) * 3
     // y = 17 s/ x
     // z = 17 s% x
@@ -219,11 +204,10 @@ async fn arith() {
         .gas_left(26)
         .output_data([1])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn comparison() {
+#[test]
+fn comparison() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -241,12 +225,11 @@ async fn comparison() {
         .gas_used(138)
         .output_data(hex!("00010100000100"))
         .check()
-        .await
 }
 
 #[allow(clippy::identity_op)]
-#[tokio::test]
-async fn bitwise() {
+#[test]
+fn bitwise() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -260,11 +243,10 @@ async fn bitwise() {
         .gas_left(0)
         .output_data([0xaa & 0xff, 0xaa | 0xff, 0xaa ^ 0xff])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn jump() {
+#[test]
+fn jump() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -282,11 +264,10 @@ async fn jump() {
         .gas_left(0)
         .output_data(hex!("befa"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn jumpi() {
+#[test]
+fn jumpi() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -299,11 +280,10 @@ async fn jumpi() {
         .gas_left(0)
         .output_data(hex!("00"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn jumpi_else() {
+#[test]
+fn jumpi_else() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -316,22 +296,20 @@ async fn jumpi_else() {
         .gas_used(15)
         .output_data(hex!(""))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn jumpi_at_the_end() {
+#[test]
+fn jumpi_at_the_end() {
     EvmTester::new()
         .code(hex!("5b6001600057"))
         .gas(1000)
         .status(StatusCode::OutOfGas)
         .gas_used(1000)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn bad_jumpdest() {
+#[test]
+fn bad_jumpdest() {
     for opcode in [OpCode::JUMP, OpCode::JUMPI] {
         for hex in [hex!("4345"), hex!("4342")] {
             EvmTester::new()
@@ -343,23 +321,21 @@ async fn bad_jumpdest() {
                 })
                 .status(StatusCode::BadJumpDestination)
                 .gas_left(0)
-                .check()
-                .await;
+                .check();
         }
     }
 }
 
-#[tokio::test]
-async fn jump_to_block_beginning() {
+#[test]
+fn jump_to_block_beginning() {
     EvmTester::new()
         .code(Bytecode::new().jumpi(U256::zero(), OpCode::MSIZE).jump(4))
         .status(StatusCode::BadJumpDestination)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn jumpi_stack() {
+#[test]
+fn jumpi_stack() {
     for input in [&hex!("") as &[u8], &hex!("ee") as &[u8]] {
         EvmTester::new()
             .code(
@@ -372,12 +348,11 @@ async fn jumpi_stack() {
             .input(input)
             .output_value(0xde)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn jump_over_jumpdest() {
+#[test]
+fn jump_over_jumpdest() {
     // The code contains 2 consecutive JUMPDESTs. The JUMP at the beginning lands on the second one.
     EvmTester::new()
         .code(
@@ -390,11 +365,10 @@ async fn jump_over_jumpdest() {
         .status(StatusCode::Success)
         .gas_used(3 + 8 + 1)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn pc_sum() {
+#[test]
+fn pc_sum() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -410,11 +384,10 @@ async fn pc_sum() {
         .status(StatusCode::Success)
         .output_value(6)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn pc_after_jump_1() {
+#[test]
+fn pc_after_jump_1() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -427,11 +400,10 @@ async fn pc_after_jump_1() {
         .status(StatusCode::Success)
         .output_value(4)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn pc_after_jump_2() {
+#[test]
+fn pc_after_jump_2() {
     for (input, output) in [(&hex!("") as &[u8], 6), (&hex!("ff") as &[u8], 11)] {
         EvmTester::new()
             .code(
@@ -453,12 +425,11 @@ async fn pc_after_jump_2() {
             .status(StatusCode::Success)
             .output_value(output)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn byte() {
+#[test]
+fn byte() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -484,11 +455,10 @@ async fn byte() {
             assert_eq!(output[6], 0);
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn byte_overflow() {
+#[test]
+fn byte_overflow() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -499,8 +469,7 @@ async fn byte_overflow() {
                 .ret_top(),
         )
         .output_value(0)
-        .check()
-        .await;
+        .check();
 
     EvmTester::new()
         .code(
@@ -512,12 +481,11 @@ async fn byte_overflow() {
                 .ret_top(),
         )
         .output_value(0)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn addmod_mulmod() {
+#[test]
+fn addmod_mulmod() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -550,11 +518,10 @@ async fn addmod_mulmod() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn divmod() {
+#[test]
+fn divmod() {
     // Div and mod the -1 by the input and return.
     EvmTester::new()
         .code(hex!("600035600160000381810460005281810660205260406000f3"))
@@ -572,11 +539,10 @@ async fn divmod() {
             );
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn div_by_zero() {
+#[test]
+fn div_by_zero() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -591,11 +557,10 @@ async fn div_by_zero() {
         .gas_used(34)
         .output_value(0)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn mod_by_zero() {
+#[test]
+fn mod_by_zero() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -610,11 +575,10 @@ async fn mod_by_zero() {
         .gas_used(34)
         .output_value(0)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn addmod_mulmod_by_zero() {
+#[test]
+fn addmod_mulmod_by_zero() {
     EvmTester::new()
         .code(hex!("6000358080808008091560005260206000f3"))
         .status(StatusCode::Success)
@@ -623,12 +587,11 @@ async fn addmod_mulmod_by_zero() {
             assert_eq!(output.len(), 32);
             assert_eq!(output[31], 1);
         })
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn signextend() {
+#[test]
+fn signextend() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -652,12 +615,11 @@ async fn signextend() {
                 hex!("0000000000000000000000000000000000000000000000000000000000007ffe")
             );
         })
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn signextend_31() {
+#[test]
+fn signextend_31() {
     for (code, output) in [
         (
             hex!("61010160000360081c601e0b60005260206000f3"),
@@ -674,13 +636,12 @@ async fn signextend_31() {
             .status(StatusCode::Success)
             .gas_used(38)
             .output_value(output)
-            .check()
-            .await;
+            .check();
     }
 }
 
-#[tokio::test]
-async fn exp() {
+#[test]
+fn exp() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -697,11 +658,10 @@ async fn exp() {
             "263cf24662b24c371a647c1340022619306e431bf3a4298d4b5998a3f1c1aaa3"
         ))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn exp_1_0() {
+#[test]
+fn exp_1_0() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -715,11 +675,10 @@ async fn exp_1_0() {
         .gas_used(31)
         .output_value(1)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn exp_0_0() {
+#[test]
+fn exp_0_0() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -733,30 +692,27 @@ async fn exp_0_0() {
         .gas_used(31)
         .output_value(1)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn exp_oog() {
+#[test]
+fn exp_oog() {
     let code = hex!("6001600003800a");
     EvmTester::new()
         .code(code)
         .gas(1622)
         .status(StatusCode::Success)
         .gas_left(0)
-        .check()
-        .await;
+        .check();
     EvmTester::new()
         .code(code)
         .gas(1621)
         .status(StatusCode::OutOfGas)
         .gas_left(0)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn exp_pre_spurious_dragon() {
+#[test]
+fn exp_pre_spurious_dragon() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -773,12 +729,11 @@ async fn exp_pre_spurious_dragon() {
         .output_data(hex!(
             "422ea3761c4f6517df7f102bb18b96abf4735099209ca21256a6b8ac4d1daaa3"
         ))
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn calldataload() {
+#[test]
+fn calldataload() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -792,11 +747,10 @@ async fn calldataload() {
         .gas_left(0)
         .output_data(hex!("04050000000000000000"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn calldataload_outofrange() {
+#[test]
+fn calldataload_outofrange() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -807,11 +761,10 @@ async fn calldataload_outofrange() {
         .status(StatusCode::Success)
         .output_value(U256::zero())
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn calldatacopy() {
+#[test]
+fn calldatacopy() {
     let code = Bytecode::new()
         .append(hex!("366001600037")) // CALLDATASIZE 1 0 CALLDATACOPY
         .append(hex!("600a6000f3"));
@@ -821,27 +774,24 @@ async fn calldatacopy() {
         .status(StatusCode::Success)
         .gas_used(23)
         .output_data(hex!("02030405000000000000"))
-        .check()
-        .await;
+        .check();
 
     EvmTester::new()
-        .code(code.clone())
+        .code(code)
         .status(StatusCode::Success)
         .gas_used(20)
-        .check()
-        .await;
+        .check();
 
     EvmTester::new()
         .code(hex!("60ff66fffffffffffffa60003760ff6000f3"))
         .status(StatusCode::Success)
         .gas_used(66)
         .output_data([0; 0xff])
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn address() {
+#[test]
+fn address() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -854,11 +804,10 @@ async fn address() {
         .gas_left(0)
         .output_data(hex!("0000cc00000000000000"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn caller_callvalue() {
+#[test]
+fn caller_callvalue() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -874,33 +823,30 @@ async fn caller_callvalue() {
         .gas_left(0)
         .output_data(hex!("0000ddee000000000000"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn undefined() {
+#[test]
+fn undefined() {
     EvmTester::new()
         .code(hex!("2a"))
         .gas(1)
         .status(StatusCode::UndefinedInstruction)
         .gas_left(0)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn invalid() {
+#[test]
+fn invalid() {
     EvmTester::new()
         .code(hex!("fe"))
         .gas(1)
         .status(StatusCode::InvalidInstruction)
         .gas_left(0)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn keccak256() {
+#[test]
+fn keccak256() {
     EvmTester::new()
         .code(hex!("6108006103ff2060005260206000f3"))
         .status(StatusCode::Success)
@@ -909,11 +855,10 @@ async fn keccak256() {
             "aeffb38c06e111d84216396baefeb7fed397f303d5cb84a33f1e8b485c4a22da"
         ))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn keccak256_empty() {
+#[test]
+fn keccak256_empty() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -926,11 +871,10 @@ async fn keccak256_empty() {
             "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
         ))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn revert() {
+#[test]
+fn revert() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -941,11 +885,10 @@ async fn revert() {
         .status(StatusCode::Revert)
         .output_data(hex!("00ee"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn return_empty_buffer_at_offset_0() {
+#[test]
+fn return_empty_buffer_at_offset_0() {
     EvmTester::new()
         .code(
             Bytecode::new()
@@ -955,11 +898,10 @@ async fn return_empty_buffer_at_offset_0() {
         )
         .gas_used(5)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn return_empty_buffer_at_high_offset() {
+#[test]
+fn return_empty_buffer_at_high_offset() {
     for (opcode, status) in [
         (OpCode::RETURN, StatusCode::Success),
         (OpCode::REVERT, StatusCode::Revert),
@@ -976,13 +918,12 @@ async fn return_empty_buffer_at_high_offset() {
                     hex!("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1").into()
             })
             .status(status)
-            .check()
-            .await;
+            .check();
     }
 }
 
-#[tokio::test]
-async fn shl() {
+#[test]
+fn shl() {
     EvmTester::new()
         .code(hex!("600560011b6000526001601ff3"))
         .revision(Revision::Constantinople)
@@ -990,11 +931,10 @@ async fn shl() {
         .status(StatusCode::Success)
         .output_data([5 << 1])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn shr() {
+#[test]
+fn shr() {
     EvmTester::new()
         .code(hex!("600560011c6000526001601ff3"))
         .revision(Revision::Constantinople)
@@ -1002,23 +942,21 @@ async fn shr() {
         .status(StatusCode::Success)
         .output_data([5 >> 1])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn sar() {
+#[test]
+fn sar() {
     EvmTester::new()
         .code(hex!("600160000360021d60005260016000f3"))
         .revision(Revision::Constantinople)
         .gas_used(30)
         .status(StatusCode::Success)
         .output_data([0xff])
-        .check()
-        .await // MSB of (-1 >> 2) == -1
+        .check() // MSB of (-1 >> 2) == -1
 }
 
-#[tokio::test]
-async fn sar_01() {
+#[test]
+fn sar_01() {
     EvmTester::new()
         .code(hex!("600060011d60005260016000f3"))
         .revision(Revision::Constantinople)
@@ -1026,11 +964,10 @@ async fn sar_01() {
         .status(StatusCode::Success)
         .output_data([0])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn shift_overflow() {
+#[test]
+fn shift_overflow() {
     for op in [OpCode::SHL, OpCode::SHR, OpCode::SAR] {
         EvmTester::new()
             .code(
@@ -1049,34 +986,31 @@ async fn shift_overflow() {
                 );
             })
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn undefined_instruction_analysis_overflow() {
+#[test]
+fn undefined_instruction_analysis_overflow() {
     let undefined_opcode = OpCode(0x0c);
     EvmTester::new()
         .code(Bytecode::new().opcode(undefined_opcode))
         .status(StatusCode::UndefinedInstruction)
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn abort() {
+#[test]
+fn abort() {
     for r in Revision::iter() {
         EvmTester::new()
             .code(hex!("fe"))
             .revision(r)
             .status(StatusCode::InvalidInstruction)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn staticmode() {
+#[test]
+fn staticmode() {
     for op in [
         OpCode::SSTORE,
         OpCode::LOG0,
@@ -1101,23 +1035,21 @@ async fn staticmode() {
             .status(StatusCode::StaticModeViolation)
             .gas_left(0)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn memory_big_allocation() {
+#[test]
+fn memory_big_allocation() {
     const SIZE: usize = 256 * 1024 + 1;
     EvmTester::new()
         .code(Bytecode::new().ret(0, SIZE))
         .status(StatusCode::Success)
         .output_data([0; SIZE])
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn memory_grow_mstore8() {
+#[test]
+fn memory_grow_mstore8() {
     let code = Bytecode::new()
         .pushv(0)
         .opcode(OpCode::CALLDATALOAD)
@@ -1156,35 +1088,32 @@ async fn memory_grow_mstore8() {
             }
         })
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn mstore8_memory_cost() {
+#[test]
+fn mstore8_memory_cost() {
     for (gas, status) in [(12, StatusCode::Success), (11, StatusCode::OutOfGas)] {
         EvmTester::new()
             .code(Bytecode::new().pushv(0).mstore8(0))
             .gas(gas)
             .status(status)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn keccak256_memory_cost() {
+#[test]
+fn keccak256_memory_cost() {
     for (gas, status) in [(45, StatusCode::Success), (44, StatusCode::OutOfGas)] {
         EvmTester::new()
             .code(Bytecode::new().pushv(1).pushv(0).opcode(OpCode::KECCAK256))
             .gas(gas)
             .status(status)
             .check()
-            .await
     }
 }
 
-#[tokio::test]
-async fn calldatacopy_memory_cost() {
+#[test]
+fn calldatacopy_memory_cost() {
     for (gas, status) in [(18, StatusCode::Success), (17, StatusCode::OutOfGas)] {
         EvmTester::new()
             .code(
@@ -1197,14 +1126,13 @@ async fn calldatacopy_memory_cost() {
             .gas(gas)
             .status(status)
             .check()
-            .await
     }
 }
 
 const MAX_CODE_SIZE: usize = 0x6000;
 
-#[tokio::test]
-async fn max_code_size_push1() {
+#[test]
+fn max_code_size_push1() {
     let mut code = Bytecode::new();
     for _ in 0..MAX_CODE_SIZE / 2 {
         code = code.pushv(1);
@@ -1215,17 +1143,15 @@ async fn max_code_size_push1() {
     EvmTester::new()
         .code(code.clone())
         .status(StatusCode::StackOverflow)
-        .check()
-        .await;
+        .check();
     EvmTester::new()
         .code(code[..code.len() - 1].to_vec())
         .status(StatusCode::StackOverflow)
-        .check()
-        .await;
+        .check();
 }
 
-#[tokio::test]
-async fn reverse_16_stack_items() {
+#[test]
+fn reverse_16_stack_items() {
     // This test puts values 1, 2, ... , 16 on the stack and then reverse them with SWAP opcodes.
     // This uses all variants of SWAP instruction.
 
@@ -1278,11 +1204,10 @@ async fn reverse_16_stack_items() {
         .status(StatusCode::Success)
         .output_data(hex!("0102030405060708090a0b0c0d0e0f10"))
         .check()
-        .await
 }
 
-#[tokio::test]
-async fn memory_access() {
+#[test]
+fn memory_access() {
     struct MemoryAccessOpcode {
         opcode: OpCode,
         memory_index_arg: i8,
@@ -1412,7 +1337,6 @@ async fn memory_access() {
                             StatusCode::Success
                         })
                         .check_and_get_result()
-                        .await
                         .gas_left,
                     0
                 );
@@ -1424,8 +1348,7 @@ async fn memory_access() {
                     tester.status(StatusCode::OutOfGas)
                 }
                 .gas_left(0)
-                .check()
-                .await;
+                .check();
             }
         }
     }

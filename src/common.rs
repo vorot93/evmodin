@@ -36,6 +36,9 @@ pub enum Revision {
 
     /// [The London revision.](https://github.com/ethereum/eth1.0-specs/blob/master/network-upgrades/mainnet-upgrades/london.md)
     London = 9,
+
+    /// The Shanghai revision.
+    Shanghai = 10,
 }
 
 impl Revision {
@@ -51,17 +54,18 @@ impl Revision {
             Self::Istanbul,
             Self::Berlin,
             Self::London,
+            Self::Shanghai,
         ])
             .iter()
             .copied()
     }
 
-    pub const fn len() -> usize {
-        Self::London as usize + 1
+    pub const fn latest() -> Self {
+        Self::Shanghai
     }
 
-    pub const fn latest() -> Self {
-        Self::London
+    pub const fn len() -> usize {
+        Self::latest() as usize + 1
     }
 }
 
@@ -165,7 +169,7 @@ pub enum CallKind {
 }
 
 /// The message describing an EVM call,
-/// including a zero-depth calls from a transaction origin.
+/// including a zero-depth call from transaction origin.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     /// The kind of the call. For zero-depth calls `CallKind::Call` SHOULD be used.
@@ -204,6 +208,38 @@ pub struct Output {
     pub output_data: Bytes,
     /// Contract creation address.
     pub create_address: Option<Address>,
+}
+
+/// EVM execution output if no error has occurred.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SuccessfulOutput {
+    /// Indicates if revert was requested.
+    pub reverted: bool,
+    /// How much gas was left after execution.
+    pub gas_left: i64,
+    /// Output data returned.
+    pub output_data: Bytes,
+}
+
+impl From<SuccessfulOutput> for Output {
+    fn from(
+        SuccessfulOutput {
+            reverted,
+            gas_left,
+            output_data,
+        }: SuccessfulOutput,
+    ) -> Self {
+        Self {
+            status_code: if reverted {
+                StatusCode::Revert
+            } else {
+                StatusCode::Success
+            },
+            gas_left,
+            output_data,
+            create_address: None,
+        }
+    }
 }
 
 pub(crate) fn u256_to_address(v: U256) -> Address {

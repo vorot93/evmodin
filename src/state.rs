@@ -2,10 +2,12 @@ use crate::common::{Message, Revision};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::U256;
+use getset::{Getters, MutGetters};
 use serde::Serialize;
 
 const SIZE: usize = 1024;
 
+/// EVM stack.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Stack(pub ArrayVec<U256, SIZE>);
 
@@ -31,6 +33,10 @@ impl Stack {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn push(&mut self, v: U256) {
         self.0.push(v)
     }
@@ -48,17 +54,20 @@ impl Stack {
 
 pub type Memory = Vec<u8>;
 
-/// Execution state
-#[derive(Debug)]
+/// EVM execution state.
+#[derive(Clone, Debug, Getters, MutGetters)]
 pub struct ExecutionState {
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) gas_left: i64,
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) stack: Stack,
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) memory: Memory,
     pub(crate) message: Message,
     pub(crate) evm_revision: Revision,
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) return_data: Bytes,
     pub(crate) output_data: Bytes,
-    pub(crate) current_block_cost: u32,
 }
 
 impl ExecutionState {
@@ -71,7 +80,6 @@ impl ExecutionState {
             evm_revision,
             return_data: Default::default(),
             output_data: Bytes::new(),
-            current_block_cost: 0,
         }
     }
 }

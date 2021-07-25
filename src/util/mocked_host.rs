@@ -1,5 +1,4 @@
 use crate::{host::*, *};
-use async_trait::async_trait;
 use bytes::Bytes;
 use ethereum_types::{Address, H256, U256};
 use hex_literal::hex;
@@ -120,33 +119,27 @@ impl Records {
     }
 }
 
-#[async_trait]
 impl crate::Host for MockedHost {
-    async fn account_exists(&self, address: ethereum_types::Address) -> anyhow::Result<bool> {
+    fn account_exists(&self, address: ethereum_types::Address) -> bool {
         self.recorded.lock().record_account_access(address);
-        Ok(self.accounts.contains_key(&address))
+        self.accounts.contains_key(&address)
     }
 
-    async fn get_storage(
-        &self,
-        address: ethereum_types::Address,
-        key: H256,
-    ) -> anyhow::Result<H256> {
+    fn get_storage(&self, address: ethereum_types::Address, key: H256) -> H256 {
         self.recorded.lock().record_account_access(address);
 
-        Ok(self
-            .accounts
+        self.accounts
             .get(&address)
             .and_then(|account| account.storage.get(&key).map(|value| value.value))
-            .unwrap_or_else(H256::zero))
+            .unwrap_or_else(H256::zero)
     }
 
-    async fn set_storage(
+    fn set_storage(
         &mut self,
         address: ethereum_types::Address,
         key: H256,
         value: H256,
-    ) -> anyhow::Result<StorageStatus> {
+    ) -> StorageStatus {
         self.recorded.lock().record_account_access(address);
 
         // Get the reference to the old value.
@@ -165,7 +158,7 @@ impl crate::Host for MockedHost {
         // WARNING! This is not complete implementation as refund is not handled here.
 
         if old.value == value {
-            return Ok(StorageStatus::Unchanged);
+            return StorageStatus::Unchanged;
         }
 
         let status = if !old.dirty {
@@ -183,55 +176,40 @@ impl crate::Host for MockedHost {
 
         old.value = value;
 
-        Ok(status)
+        status
     }
 
-    async fn get_balance(
-        &self,
-        address: ethereum_types::Address,
-    ) -> anyhow::Result<ethereum_types::U256> {
+    fn get_balance(&self, address: ethereum_types::Address) -> ethereum_types::U256 {
         self.recorded.lock().record_account_access(address);
 
-        Ok(self
-            .accounts
+        self.accounts
             .get(&address)
             .map(|acc| acc.balance)
-            .unwrap_or_else(U256::zero))
+            .unwrap_or_else(U256::zero)
     }
 
-    async fn get_code_size(
-        &self,
-        address: ethereum_types::Address,
-    ) -> anyhow::Result<ethereum_types::U256> {
+    fn get_code_size(&self, address: ethereum_types::Address) -> ethereum_types::U256 {
         self.recorded.lock().record_account_access(address);
 
-        Ok(self
-            .accounts
+        self.accounts
             .get(&address)
             .map(|acc| acc.code.len().into())
-            .unwrap_or_else(U256::zero))
+            .unwrap_or_else(U256::zero)
     }
 
-    async fn get_code_hash(&self, address: ethereum_types::Address) -> anyhow::Result<H256> {
+    fn get_code_hash(&self, address: ethereum_types::Address) -> H256 {
         self.recorded.lock().record_account_access(address);
 
-        Ok(self
-            .accounts
+        self.accounts
             .get(&address)
             .map(|acc| acc.code_hash)
-            .unwrap_or_else(H256::zero))
+            .unwrap_or_else(H256::zero)
     }
 
-    async fn copy_code(
-        &self,
-        address: Address,
-        code_offset: usize,
-        buffer: &mut [u8],
-    ) -> anyhow::Result<usize> {
+    fn copy_code(&self, address: Address, code_offset: usize, buffer: &mut [u8]) -> usize {
         self.recorded.lock().record_account_access(address);
 
-        Ok(self
-            .accounts
+        self.accounts
             .get(&address)
             .map(|acc| {
                 let code = &acc.code;
@@ -246,14 +224,14 @@ impl crate::Host for MockedHost {
 
                 n
             })
-            .unwrap_or(0))
+            .unwrap_or(0)
     }
 
-    async fn selfdestruct(
+    fn selfdestruct(
         &mut self,
         address: ethereum_types::Address,
         beneficiary: ethereum_types::Address,
-    ) -> anyhow::Result<()> {
+    ) {
         let mut r = self.recorded.lock();
 
         r.record_account_access(address);
@@ -261,11 +239,9 @@ impl crate::Host for MockedHost {
             selfdestructed: address,
             beneficiary,
         });
-
-        Ok(())
     }
 
-    async fn call(&mut self, msg: &Message) -> anyhow::Result<Output> {
+    fn call(&mut self, msg: &Message) -> Output {
         let mut r = self.recorded.lock();
 
         r.record_account_access(msg.destination);
@@ -277,36 +253,27 @@ impl crate::Host for MockedHost {
                 r.call_inputs.push(call_msg.input_data.clone());
             }
         }
-        Ok(self.call_result.clone())
+        self.call_result.clone()
     }
 
-    async fn get_tx_context(&self) -> anyhow::Result<TxContext> {
-        Ok(self.tx_context.clone())
+    fn get_tx_context(&self) -> TxContext {
+        self.tx_context.clone()
     }
 
-    async fn get_block_hash(&self, block_number: u64) -> anyhow::Result<H256> {
+    fn get_block_hash(&self, block_number: u64) -> H256 {
         self.recorded.lock().blockhashes.push(block_number);
-        Ok(self.block_hash)
+        self.block_hash
     }
 
-    async fn emit_log(
-        &mut self,
-        address: ethereum_types::Address,
-        data: &[u8],
-        topics: &[H256],
-    ) -> anyhow::Result<()> {
+    fn emit_log(&mut self, address: ethereum_types::Address, data: &[u8], topics: &[H256]) {
         self.recorded.lock().logs.push(LogRecord {
             creator: address,
             data: data.to_vec().into(),
             topics: topics.to_vec(),
         });
-        Ok(())
     }
 
-    async fn access_account(
-        &mut self,
-        address: ethereum_types::Address,
-    ) -> anyhow::Result<AccessStatus> {
+    fn access_account(&mut self, address: ethereum_types::Address) -> AccessStatus {
         let mut r = self.recorded.lock();
 
         // Check if the address have been already accessed.
@@ -317,21 +284,17 @@ impl crate::Host for MockedHost {
         if address.0 >= hex!("0000000000000000000000000000000000000001")
             && address.0 <= hex!("0000000000000000000000000000000000000009")
         {
-            return Ok(AccessStatus::Warm);
+            return AccessStatus::Warm;
         }
 
-        Ok(if already_accessed {
+        if already_accessed {
             AccessStatus::Warm
         } else {
             AccessStatus::Cold
-        })
+        }
     }
 
-    async fn access_storage(
-        &mut self,
-        address: ethereum_types::Address,
-        key: H256,
-    ) -> anyhow::Result<AccessStatus> {
+    fn access_storage(&mut self, address: ethereum_types::Address, key: H256) -> AccessStatus {
         let value = self
             .accounts
             .entry(address)
@@ -341,6 +304,6 @@ impl crate::Host for MockedHost {
             .or_default();
         let access_status = value.access_status;
         value.access_status = AccessStatus::Warm;
-        Ok(access_status)
+        access_status
     }
 }
