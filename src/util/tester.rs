@@ -14,7 +14,7 @@ fn exec(host: &mut MockedHost, revision: Revision, message: Message, code: Bytes
         host.access_account(message.sender);
         host.access_account(message.destination);
     }
-    AnalyzedCode::analyze(code).execute(host, StdoutTracer::default(), message, revision)
+    AnalyzedCode::analyze(code).execute(host, StdoutTracer::default(), None, message, revision)
 }
 
 #[derive(Clone, Copy, Debug)]

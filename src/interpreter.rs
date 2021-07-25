@@ -114,11 +114,12 @@ impl AnalyzedCode {
         Self { jumpdest_map, code }
     }
 
-    /// Execute analyzed EVM bytecode.
+    /// Execute analyzed EVM bytecode using provided `Host` context. Optionally modify the state after each instruction using provided closure.
     pub fn execute<H: Host, T: Tracer + 'static>(
         &self,
         host: &mut H,
         mut tracer: T,
+        state_modifier: StateModifier,
         message: Message,
         revision: Revision,
     ) -> Output {
@@ -126,15 +127,18 @@ impl AnalyzedCode {
             tracer.notify_execution_start(revision, message.clone(), self.code.clone());
         }
 
-        let mut interrupt =
-            InterruptVariant::ExecutionStart(self.execute_resumable(!T::DUMMY, message, revision));
+        let mut interrupt = InterruptVariant::ExecutionStart(self.execute_resumable(
+            !T::DUMMY || state_modifier.is_some(),
+            message,
+            revision,
+        ));
 
         loop {
             interrupt = match interrupt {
                 InterruptVariant::ExecutionStart(i) => i.resume(()),
                 InterruptVariant::InstructionStart(i) => {
                     tracer.notify_instruction_start(i.data().pc, i.data().opcode, &i.data().state);
-                    i.resume(())
+                    i.resume(state_modifier.clone())
                 }
                 InterruptVariant::AccountExists(i) => {
                     let exists = host.account_exists(i.data().address);
@@ -232,6 +236,7 @@ impl AnalyzedCode {
         }
     }
 
+    /// Execute in resumable EVM.
     pub fn execute_resumable(
         &self,
         trace: bool,
@@ -266,14 +271,20 @@ async fn interpreter_producer(
 
         // Do not print stop on the final STOP
         if trace && pc != s.code.len() - 1 {
-            co.yield_(InterruptDataVariant::InstructionStart(Box::new(
-                InstructionStart {
-                    pc,
-                    opcode: op,
-                    state: state.clone(),
-                },
-            )))
-            .await;
+            if let Some(modifier) = co
+                .yield_(InterruptDataVariant::InstructionStart(Box::new(
+                    InstructionStart {
+                        pc,
+                        opcode: op,
+                        state: state.clone(),
+                    },
+                )))
+                .await
+                .as_state_modifier()
+                .unwrap()
+            {
+                (modifier)(state)
+            }
         }
 
         check_requirements(instruction_table, state, op)?;

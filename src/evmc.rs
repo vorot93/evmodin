@@ -330,6 +330,7 @@ impl EvmcVm for EvmOdin {
             code.execute(
                 context,
                 NoopTracer,
+                None,
                 Message::from_evmc(&message),
                 revision.into(),
             )
@@ -337,6 +338,7 @@ impl EvmcVm for EvmOdin {
             code.execute(
                 &mut DummyHost,
                 NoopTracer,
+                None,
                 Message::from_evmc(&message),
                 revision.into(),
             )

@@ -1,4 +1,8 @@
 use super::*;
+use educe::Educe;
+use std::sync::Arc;
+
+pub type StateModifier = Option<Arc<dyn Fn(&mut ExecutionState) + Send + Sync>>;
 
 #[derive(Debug)]
 pub struct AccountExistsStatus {
@@ -61,10 +65,12 @@ pub struct AccessStorageStatus {
 }
 
 /// All resumed data variants.
-#[derive(Debug, EnumAsInner, From)]
+#[derive(Educe, EnumAsInner, From)]
+#[educe(Debug)]
 pub(crate) enum ResumeDataVariant {
     #[from(ignore)]
     Empty,
+    StateModifier(#[educe(Debug(false))] StateModifier),
     AccountExistsStatus(AccountExistsStatus),
     Balance(Balance),
     CodeSize(CodeSize),

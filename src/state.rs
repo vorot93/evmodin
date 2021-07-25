@@ -2,6 +2,7 @@ use crate::common::{Message, Revision};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::U256;
+use getset::{Getters, MutGetters};
 use serde::Serialize;
 
 const SIZE: usize = 1024;
@@ -49,13 +50,18 @@ impl Stack {
 pub type Memory = Vec<u8>;
 
 /// Execution state
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Getters, MutGetters)]
 pub struct ExecutionState {
+    #[getset(get, get_mut)]
     pub(crate) gas_left: i64,
+    #[getset(get, get_mut)]
     pub(crate) stack: Stack,
+    #[getset(get, get_mut)]
     pub(crate) memory: Memory,
+    #[getset(get, get_mut)]
     pub(crate) message: Message,
     pub(crate) evm_revision: Revision,
+    #[getset(get, get_mut)]
     pub(crate) return_data: Bytes,
     pub(crate) output_data: Bytes,
 }

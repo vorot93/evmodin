@@ -43,7 +43,7 @@ interrupt! {
 interrupt! {
     /// New instruction has been encountered.
     InstructionStartInterrupt,
-    Box<InstructionStart> => ()
+    Box<InstructionStart> => StateModifier
 }
 interrupt! {
     /// Does this account exist?
