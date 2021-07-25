@@ -133,36 +133,36 @@ impl AnalyzedCode {
             interrupt = match interrupt {
                 InterruptVariant::ExecutionStart(i) => i.resume(()),
                 InterruptVariant::InstructionStart(i) => {
-                    tracer.notify_instruction_start(i.data.pc, i.data.opcode, &i.data.state);
+                    tracer.notify_instruction_start(i.data().pc, i.data().opcode, &i.data().state);
                     i.resume(())
                 }
                 InterruptVariant::AccountExists(i) => {
-                    let exists = host.account_exists(i.data.address);
+                    let exists = host.account_exists(i.data().address);
                     i.resume(AccountExistsStatus { exists })
                 }
                 InterruptVariant::GetBalance(i) => {
-                    let balance = host.get_balance(i.data.address);
+                    let balance = host.get_balance(i.data().address);
                     i.resume(Balance { balance })
                 }
                 InterruptVariant::GetCodeSize(i) => {
-                    let code_size = host.get_code_size(i.data.address);
+                    let code_size = host.get_code_size(i.data().address);
                     i.resume(CodeSize { code_size })
                 }
                 InterruptVariant::GetStorage(i) => {
-                    let value = host.get_storage(i.data.address, i.data.key);
+                    let value = host.get_storage(i.data().address, i.data().key);
                     i.resume(StorageValue { value })
                 }
                 InterruptVariant::SetStorage(i) => {
-                    let status = host.set_storage(i.data.address, i.data.key, i.data.value);
+                    let status = host.set_storage(i.data().address, i.data().key, i.data().value);
                     i.resume(StorageStatusInfo { status })
                 }
                 InterruptVariant::GetCodeHash(i) => {
-                    let hash = host.get_code_hash(i.data.address);
+                    let hash = host.get_code_hash(i.data().address);
                     i.resume(CodeHash { hash })
                 }
                 InterruptVariant::CopyCode(i) => {
-                    let mut code = vec![0; i.data.max_size];
-                    let copied = host.copy_code(i.data.address, i.data.offset, &mut code[..]);
+                    let mut code = vec![0; i.data().max_size];
+                    let copied = host.copy_code(i.data().address, i.data().offset, &mut code[..]);
                     if copied > code.len() {
                         return Output {
                             status_code: StatusCode::InternalError(format!(
@@ -180,11 +180,11 @@ impl AnalyzedCode {
                     i.resume(Code { code })
                 }
                 InterruptVariant::Selfdestruct(i) => {
-                    host.selfdestruct(i.data.address, i.data.beneficiary);
+                    host.selfdestruct(i.data().address, i.data().beneficiary);
                     i.resume(())
                 }
                 InterruptVariant::Call(i) => {
-                    let output = host.call(&i.data.message);
+                    let output = host.call(&i.data().message);
                     i.resume(CallOutput { output })
                 }
                 InterruptVariant::GetTxContext(i) => {
@@ -192,23 +192,27 @@ impl AnalyzedCode {
                     i.resume(TxContextData { context })
                 }
                 InterruptVariant::GetBlockHash(i) => {
-                    let hash = host.get_block_hash(i.data.block_number);
+                    let hash = host.get_block_hash(i.data().block_number);
                     i.resume(BlockHash { hash })
                 }
                 InterruptVariant::EmitLog(i) => {
-                    host.emit_log(i.data.address, &*i.data.data, i.data.topics.as_slice());
+                    host.emit_log(
+                        i.data().address,
+                        &*i.data().data,
+                        i.data().topics.as_slice(),
+                    );
                     i.resume(())
                 }
                 InterruptVariant::AccessAccount(i) => {
-                    let status = host.access_account(i.data.address);
+                    let status = host.access_account(i.data().address);
                     i.resume(AccessAccountStatus { status })
                 }
                 InterruptVariant::AccessStorage(i) => {
-                    let status = host.access_storage(i.data.address, i.data.key);
+                    let status = host.access_storage(i.data().address, i.data().key);
                     i.resume(AccessStorageStatus { status })
                 }
                 InterruptVariant::Complete(i) => {
-                    let output = match i.data {
+                    let output = match i {
                         Ok(output) => output.into(),
                         Err(status_code) => Output {
                             status_code,

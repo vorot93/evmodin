@@ -15,14 +15,18 @@ macro_rules! interrupt {
                         + Unpin,
                 >,
             >,
-            /// Data returned by this interrupt.
-            pub data: $data,
+            pub(crate) data: $data,
         }
 
         impl sealed::Sealed for $name {}
 
         impl Interrupt for $name {
+            type InterruptData = $data;
             type ResumeData = $resume_with;
+
+            fn data(&self) -> &Self::InterruptData {
+                &self.data
+            }
 
             fn resume(self, resume_data: $resume_with) -> InterruptVariant {
                 resume_interrupt(self.inner, resume_data.into())
@@ -111,13 +115,6 @@ interrupt! {
     AccessStorageInterrupt,
     AccessStorage => AccessStorageStatus
 }
-interrupt! {
-    /// Execution complete. Output is attached.
-    ///
-    /// NOTE: this is a special interrupt. It cannot be resumed.
-    CompleteInterrupt,
-    Result<SuccessfulOutput, StatusCode> => Infallible
-}
 
 /// Collection of all possible interrupts. Match on this to get the specific interrupt returned.
 #[derive(From)]
@@ -138,5 +135,5 @@ pub enum InterruptVariant {
     EmitLog(EmitLogInterrupt),
     AccessAccount(AccessAccountInterrupt),
     AccessStorage(AccessStorageInterrupt),
-    Complete(CompleteInterrupt),
+    Complete(Result<SuccessfulOutput, StatusCode>),
 }

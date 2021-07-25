@@ -25,9 +25,13 @@ pub mod resume_data;
 
 /// Paused EVM with full state inside.
 pub trait Interrupt: sealed::Sealed {
+    /// Interrupt data returned.
+    type InterruptData;
     /// Data required to resume execution.
     type ResumeData;
 
+    /// Get interrupt data.
+    fn data(&self) -> &Self::InterruptData;
     /// Resume execution until the next interrupt.
     fn resume(self, resume_data: Self::ResumeData) -> InterruptVariant;
 }
@@ -75,8 +79,6 @@ fn resume_interrupt(mut inner: InnerCoroutine, resume_data: ResumeDataVariant) -
                 AccessStorageInterrupt { inner, data }.into()
             }
         },
-        GeneratorState::Complete(data) => {
-            InterruptVariant::Complete(CompleteInterrupt { inner, data })
-        }
+        GeneratorState::Complete(res) => InterruptVariant::Complete(res),
     }
 }
