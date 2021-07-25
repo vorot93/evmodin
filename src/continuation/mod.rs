@@ -16,11 +16,11 @@ mod sealed {
     pub trait Sealed {}
 }
 
-/// Interrupts
+/// Interrupts.
 pub mod interrupt;
-/// Data attached to interrupts
+/// Data attached to interrupts.
 pub mod interrupt_data;
-/// Data required for resume
+/// Data required for resume.
 pub mod resume_data;
 
 /// Paused EVM with full state inside.

@@ -169,7 +169,7 @@ pub enum CallKind {
 }
 
 /// The message describing an EVM call,
-/// including a zero-depth calls from a transaction origin.
+/// including a zero-depth call from transaction origin.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     /// The kind of the call. For zero-depth calls `CallKind::Call` SHOULD be used.
