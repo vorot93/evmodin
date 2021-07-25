@@ -127,15 +127,12 @@ impl AnalyzedCode {
             tracer.notify_execution_start(revision, message.clone(), self.code.clone());
         }
 
-        let mut interrupt = InterruptVariant::ExecutionStart(self.execute_resumable(
-            !T::DUMMY || state_modifier.is_some(),
-            message,
-            revision,
-        ));
+        let mut interrupt = self
+            .execute_resumable(!T::DUMMY || state_modifier.is_some(), message, revision)
+            .resume(());
 
         loop {
             interrupt = match interrupt {
-                InterruptVariant::ExecutionStart(i) => i.resume(()),
                 InterruptVariant::InstructionStart(i) => {
                     tracer.notify_instruction_start(i.data().pc, i.data().opcode, &i.data().state);
                     i.resume(state_modifier.clone())

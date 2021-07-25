@@ -119,7 +119,6 @@ interrupt! {
 /// Collection of all possible interrupts. Match on this to get the specific interrupt returned.
 #[derive(From)]
 pub enum InterruptVariant {
-    ExecutionStart(ExecutionStartInterrupt),
     InstructionStart(InstructionStartInterrupt),
     AccountExists(AccountExistsInterrupt),
     GetStorage(GetStorageInterrupt),
