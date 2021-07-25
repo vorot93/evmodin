@@ -42,6 +42,7 @@ pub use common::{CallKind, Message, Output, Revision, StatusCode, SuccessfulOutp
 pub use host::Host;
 pub use interpreter::AnalyzedCode;
 pub use opcode::OpCode;
+pub use state::{ExecutionState, Stack};
 
 mod common;
 pub mod host;

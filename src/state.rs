@@ -7,6 +7,7 @@ use serde::Serialize;
 
 const SIZE: usize = 1024;
 
+/// EVM stack.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Stack(pub ArrayVec<U256, SIZE>);
 
@@ -32,6 +33,10 @@ impl Stack {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn push(&mut self, v: U256) {
         self.0.push(v)
     }
@@ -49,19 +54,18 @@ impl Stack {
 
 pub type Memory = Vec<u8>;
 
-/// Execution state
+/// EVM execution state.
 #[derive(Clone, Debug, Getters, MutGetters)]
 pub struct ExecutionState {
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) gas_left: i64,
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) stack: Stack,
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) memory: Memory,
-    #[getset(get, get_mut)]
     pub(crate) message: Message,
     pub(crate) evm_revision: Revision,
-    #[getset(get, get_mut)]
+    #[getset(get = "pub", get_mut = "pub")]
     pub(crate) return_data: Bytes,
     pub(crate) output_data: Bytes,
 }
