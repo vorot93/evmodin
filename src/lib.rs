@@ -1,4 +1,4 @@
-//! Fast EVM implementation with full async support. Port of [evmone](https://github.com/ethereum/evmone) to Rust.
+//! Fast EVM implementation with support for resumability. Port of [evmone](https://github.com/ethereum/evmone) to Rust.
 //!
 //! # Usage
 //! ```
@@ -38,7 +38,7 @@
 //! )
 //! ```
 use bytes::Bytes;
-pub use common::{CallKind, Message, Output, Revision, StatusCode};
+pub use common::{CallKind, Message, Output, Revision, StatusCode, SuccessfulOutput};
 pub use host::Host;
 pub use interpreter::AnalyzedCode;
 pub use opcode::OpCode;
@@ -52,7 +52,7 @@ pub mod opcode;
 mod state;
 pub mod tracing;
 
-mod continuation;
+pub mod continuation;
 #[cfg(feature = "util")]
 pub mod util;
 

@@ -5,7 +5,7 @@ macro_rules! do_call {
         use std::cmp::min;
         use $crate::{
             common::u256_to_address,
-            continuation::*,
+            continuation::{interrupt_data::*, resume_data::*},
             host::AccessStatus,
             instructions::{memory::MemoryRegion, properties::*},
             CallKind, Message,
@@ -159,7 +159,11 @@ macro_rules! do_call {
 macro_rules! do_create {
     ($co:expr, $state:expr, $create2:expr) => {{
         use ethereum_types::H256;
-        use $crate::{common::*, continuation::*, CallKind, Message};
+        use $crate::{
+            common::*,
+            continuation::{interrupt_data::*, resume_data::*},
+            CallKind, Message,
+        };
 
         if $state.message.is_static {
             return Err(StatusCode::StaticModeViolation);

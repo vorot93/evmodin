@@ -210,12 +210,15 @@ pub struct Output {
     pub create_address: Option<Address>,
 }
 
+/// EVM execution output if no error has occurred.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SuccessfulOutput {
+    /// Indicates if revert was requested.
     pub reverted: bool,
+    /// How much gas was left after execution.
     pub gas_left: i64,
+    /// Output data returned.
     pub output_data: Bytes,
-    pub create_address: Option<Address>,
 }
 
 impl From<SuccessfulOutput> for Output {
@@ -224,7 +227,6 @@ impl From<SuccessfulOutput> for Output {
             reverted,
             gas_left,
             output_data,
-            create_address,
         }: SuccessfulOutput,
     ) -> Self {
         Self {
@@ -235,7 +237,7 @@ impl From<SuccessfulOutput> for Output {
             },
             gas_left,
             output_data,
-            create_address,
+            create_address: None,
         }
     }
 }

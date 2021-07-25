@@ -17,7 +17,12 @@ pub(crate) fn callvalue(state: &mut ExecutionState) {
 #[macro_export]
 macro_rules! balance {
     ($co:expr, $state:expr) => {
-        use crate::{common::*, continuation::*, host::*, instructions::properties::*};
+        use crate::{
+            common::*,
+            continuation::{interrupt_data::*, resume_data::*},
+            host::*,
+            instructions::properties::*,
+        };
 
         let address = u256_to_address($state.stack.pop());
 
@@ -53,7 +58,12 @@ macro_rules! balance {
 #[macro_export]
 macro_rules! extcodesize {
     ($co:expr, $state:expr) => {
-        use crate::{common::*, continuation::*, host::*, instructions::properties::*};
+        use crate::{
+            common::*,
+            continuation::{interrupt_data::*, resume_data::*},
+            host::*,
+            instructions::properties::*,
+        };
 
         let address = u256_to_address($state.stack.pop());
 
@@ -88,6 +98,8 @@ macro_rules! extcodesize {
 #[macro_export]
 macro_rules! push_txcontext {
     ($co:expr, $state:expr, $accessor:expr) => {
+        use $crate::continuation::{interrupt_data::*, resume_data::*};
+
         let tx_context = ResumeDataVariant::into_tx_context_data(
             $co.yield_(InterruptDataVariant::GetTxContext).await,
         )
@@ -138,6 +150,8 @@ pub(crate) fn basefee_accessor(tx_context: TxContext) -> U256 {
 #[macro_export]
 macro_rules! selfbalance {
     ($co:expr, $state:expr) => {{
+        use $crate::continuation::{interrupt_data::*, resume_data::*};
+
         let balance = ResumeDataVariant::into_balance(
             $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
                 address: $state.message.destination,
@@ -156,6 +170,7 @@ macro_rules! selfbalance {
 macro_rules! blockhash {
     ($co:expr, $state:expr) => {
         use ethereum_types::H256;
+        use $crate::continuation::{interrupt_data::*, resume_data::*};
 
         let number = $state.stack.pop();
 
@@ -192,6 +207,7 @@ macro_rules! do_log {
     ($co:expr, $state:expr, $num_topics:expr) => {{
         use arrayvec::ArrayVec;
         use ethereum_types::H256;
+        use $crate::continuation::{interrupt_data::*, resume_data::*};
 
         if $state.message.is_static {
             return Err(StatusCode::StaticModeViolation);
@@ -239,7 +255,7 @@ macro_rules! sload {
     ($co:expr, $state:expr) => {{
         use ethereum_types::H256;
         use $crate::{
-            continuation::*,
+            continuation::{interrupt_data::*, resume_data::*},
             host::*,
             instructions::properties::{COLD_SLOAD_COST, WARM_STORAGE_READ_COST},
         };
@@ -287,7 +303,7 @@ macro_rules! sstore {
     ($co:expr, $state:expr) => {{
         use ethereum_types::H256;
         use $crate::{
-            continuation::*,
+            continuation::{interrupt_data::*, resume_data::*},
             host::*,
             instructions::properties::{COLD_SLOAD_COST, WARM_STORAGE_READ_COST},
         };
@@ -363,7 +379,12 @@ macro_rules! sstore {
 #[macro_export]
 macro_rules! selfdestruct {
     ($co:expr, $state:expr) => {{
-        use crate::{common::*, continuation::*, host::*, instructions::properties::*};
+        use crate::{
+            common::*,
+            continuation::{interrupt_data::*, resume_data::*},
+            host::*,
+            instructions::properties::*,
+        };
 
         if $state.message.is_static {
             return Err(StatusCode::StaticModeViolation);

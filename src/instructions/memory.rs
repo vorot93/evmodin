@@ -218,7 +218,7 @@ macro_rules! extcodecopy {
     ($co:expr, $state:expr) => {
         use crate::{
             common::*,
-            continuation::*,
+            continuation::{interrupt_data::*, resume_data::*},
             host::*,
             instructions::{memory::*, properties::*},
         };
@@ -319,7 +319,12 @@ pub(crate) fn returndatacopy(state: &mut ExecutionState) -> Result<(), StatusCod
 #[macro_export]
 macro_rules! extcodehash {
     ($co:expr, $state:expr) => {
-        use crate::{common::*, continuation::*, host::*, instructions::properties::*};
+        use crate::{
+            common::*,
+            continuation::{interrupt_data::*, resume_data::*},
+            host::*,
+            instructions::properties::*,
+        };
 
         let addr = u256_to_address($state.stack.pop());
 

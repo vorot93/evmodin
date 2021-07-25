@@ -1,7 +1,7 @@
 use self::instruction_table::*;
 use crate::{
     common::*,
-    continuation::*,
+    continuation::{interrupt::*, interrupt_data::*, resume_data::*, *},
     instructions::{control::*, stack_manip::*, *},
     state::*,
     tracing::Tracer,
@@ -605,7 +605,6 @@ async fn interpreter_producer(
         reverted,
         gas_left: state.gas_left,
         output_data: state.output_data.clone(),
-        create_address: None,
     };
 
     Ok(output)
