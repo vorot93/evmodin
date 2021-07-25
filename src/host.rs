@@ -52,8 +52,6 @@ pub struct TxContext {
 }
 
 /// Abstraction that exposes host context to EVM.
-///
-/// It is asynchronous, allowing for remote access. Errors represent network or host errors.
 pub trait Host {
     /// Check if an account exists.
     fn account_exists(&self, address: Address) -> bool;

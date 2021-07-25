@@ -8,7 +8,7 @@ use crate::{
     *,
 };
 use ethereum_types::{Address, U256};
-use genawaiter::{sync::*, *};
+use genawaiter::sync::*;
 
 fn check_requirements(
     instruction_table: &InstructionTable,
@@ -232,30 +232,18 @@ impl AnalyzedCode {
         }
     }
 
-    fn execute_with_state(
-        &self,
-        state: ExecutionState,
-        trace: bool,
-    ) -> impl Coroutine<
-        Yield = InterruptDataVariant,
-        Resume = ResumeDataVariant,
-        Return = Result<SuccessfulOutput, StatusCode>,
-    > + Send
-           + Unpin {
-        let code = self.clone();
-        Gen::new(move |co| interpreter_producer(co, code, state, trace))
-    }
-
     pub fn execute_resumable(
         &self,
         trace: bool,
         message: Message,
         revision: Revision,
     ) -> ExecutionStartInterrupt {
-        ExecutionStartInterrupt {
-            inner: Box::pin(self.execute_with_state(ExecutionState::new(message, revision), trace)),
-            data: (),
-        }
+        let code = self.clone();
+        let inner = Box::pin(Gen::new(move |co| {
+            interpreter_producer(co, code, ExecutionState::new(message, revision), trace)
+        }));
+
+        ExecutionStartInterrupt { inner, data: () }
     }
 }
 
