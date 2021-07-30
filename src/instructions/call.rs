@@ -243,11 +243,8 @@ macro_rules! do_create {
 
             $state.return_data = result.output_data;
             if result.status_code == StatusCode::Success {
-                *$state.stack.get_mut(0) = address_to_u256(
-                    result
-                        .create_address
-                        .ok_or_else(|| anyhow::anyhow!("expected create address"))?,
-                );
+                *$state.stack.get_mut(0) =
+                    address_to_u256(result.create_address.expect("expected create address"));
             }
         }
     }};

@@ -30,7 +30,7 @@ let message = Message {
 
 assert_eq!(
     AnalyzedCode::analyze(my_code)
-        .execute(&mut DummyHost, NoopTracer, None, message, Revision::latest()),
+        .execute(&mut DummyHost, &mut NoopTracer, None, message, Revision::latest()),
     Output {
         status_code: StatusCode::Success,
         gas_left: 146,
@@ -39,5 +39,3 @@ assert_eq!(
     }
 )
 ```
-
-License: Apache-2.0

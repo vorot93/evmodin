@@ -8,13 +8,25 @@ use educe::Educe;
 use ethereum_types::{Address, U256};
 use std::sync::Arc;
 
-fn exec(host: &mut MockedHost, revision: Revision, message: Message, code: Bytes) -> Output {
+fn exec(
+    host: &mut MockedHost,
+    revision: Revision,
+    message: Message,
+    code: Vec<u8>,
+    collect_traces: bool,
+) -> Output {
     // Add EIP-2929 tweak.
     if revision >= Revision::Berlin {
         host.access_account(message.sender);
         host.access_account(message.destination);
     }
-    AnalyzedCode::analyze(code).execute(host, StdoutTracer::default(), None, message, revision)
+    let code = AnalyzedCode::analyze(code);
+
+    if collect_traces {
+        code.execute(host, &mut StdoutTracer::default(), None, message, revision)
+    } else {
+        code.execute(host, &mut NoopTracer, None, message, revision)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -39,10 +51,11 @@ pub struct EvmTester {
     inspect_fn: Arc<dyn Fn(&MockedHost, &Message, &[u8]) + 'static>,
     revision: Revision,
     message: Message,
-    code: Bytes,
+    code: Vec<u8>,
     gas_check: Option<GasCheck>,
     expected_status_codes: Option<Vec<StatusCode>>,
     expected_output_data: Option<Vec<u8>>,
+    collect_traces: bool,
 }
 
 impl Default for EvmTester {
@@ -71,16 +84,17 @@ impl EvmTester {
                 input_data: Bytes::new(),
                 value: 0.into(),
             },
-            code: Bytes::new(),
+            code: Vec::new(),
             gas_check: None,
             expected_status_codes: None,
             expected_output_data: None,
+            collect_traces: false,
         }
     }
 
     /// Set code to be executed.
     pub fn code(mut self, code: impl Into<Bytecode>) -> Self {
-        self.code = code.into().build().into();
+        self.code = code.into().build();
         self
     }
 
@@ -194,14 +208,27 @@ impl EvmTester {
         self
     }
 
+    pub fn collect_traces(mut self, doit: bool) -> Self {
+        self.collect_traces = doit;
+        self
+    }
+
     /// Execute provided code, run checks and return bytecode returned by EVM.
     pub fn check_and_get_result(self) -> Output {
-        println!("Executing code: {}", hex::encode(&self.code));
+        if self.collect_traces {
+            println!("Executing code: {}", hex::encode(&self.code));
+        }
         let mut host = self.host;
         for f in self.apply_host_fns {
             (f)(&mut host, &self.message);
         }
-        let output = exec(&mut host, self.revision, self.message.clone(), self.code);
+        let output = exec(
+            &mut host,
+            self.revision,
+            self.message.clone(),
+            self.code,
+            self.collect_traces,
+        );
 
         if let Some(status_codes) = self.expected_status_codes {
             if !status_codes.iter().any(|s| *s == output.status_code) {

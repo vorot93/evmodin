@@ -65,6 +65,6 @@ pub(crate) fn xor(stack: &mut Stack) {
 }
 
 pub(crate) fn not(stack: &mut Stack) {
-    let a = stack.pop();
-    stack.push(!a);
+    let a = stack.get_mut(0);
+    *a = !*a;
 }
