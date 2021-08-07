@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use bytes::Bytes;
 use ethereum_types::{Address, H256, U256};
 use serde::Serialize;
@@ -64,6 +66,26 @@ impl Revision {
 
     pub const fn len() -> usize {
         Self::latest() as usize + 1
+    }
+}
+
+impl FromStr for Revision {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "frontier" => Ok(Self::Frontier),
+            "homestead" => Ok(Self::Homestead),
+            "tangerine" => Ok(Self::Tangerine),
+            "spurious" => Ok(Self::Spurious),
+            "byzantium" => Ok(Self::Byzantium),
+            "constantinople" => Ok(Self::Constantinople),
+            "petersburg" => Ok(Self::Petersburg),
+            "istanbul" => Ok(Self::Istanbul),
+            "berlin" => Ok(Self::Berlin),
+            "london" => Ok(Self::London),
+            "shanghai" => Ok(Self::Shanghai),
+            _ => Err(()),
+        }
     }
 }
 
