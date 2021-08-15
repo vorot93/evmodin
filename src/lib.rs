@@ -1,6 +1,8 @@
 #![doc = include_str!("../README.md")]
 use bytes::Bytes;
-pub use common::{CallKind, Message, Output, Revision, StatusCode, SuccessfulOutput};
+pub use common::{
+    CallKind, CreateMessage, Message, Output, Revision, StatusCode, SuccessfulOutput,
+};
 pub use host::Host;
 pub use interpreter::AnalyzedCode;
 pub use opcode::OpCode;

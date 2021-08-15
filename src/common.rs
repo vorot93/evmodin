@@ -189,6 +189,35 @@ pub struct Message {
     pub value: U256,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct CreateMessage {
+    pub salt: Option<H256>,
+    pub gas: i64,
+    pub depth: i32,
+    pub initcode: Bytes,
+    pub sender: Address,
+    pub endowment: U256,
+}
+
+impl From<CreateMessage> for Message {
+    fn from(msg: CreateMessage) -> Self {
+        Self {
+            kind: if let Some(salt) = msg.salt {
+                CallKind::Create2 { salt }
+            } else {
+                CallKind::Create
+            },
+            is_static: false,
+            depth: msg.depth,
+            gas: msg.gas,
+            destination: Address::zero(),
+            sender: msg.sender,
+            input_data: msg.initcode,
+            value: msg.endowment,
+        }
+    }
+}
+
 /// Output of EVM execution.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Output {

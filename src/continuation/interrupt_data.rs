@@ -54,8 +54,9 @@ pub struct Selfdestruct {
 }
 
 #[derive(Debug)]
-pub struct Call {
-    pub message: Message,
+pub enum Call {
+    Call(Message),
+    Create(CreateMessage),
 }
 
 #[derive(Debug)]

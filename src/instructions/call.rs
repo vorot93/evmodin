@@ -128,7 +128,7 @@ macro_rules! do_call {
         {
             let msg_gas = msg.gas;
             let result = ResumeDataVariant::into_call_output(
-                $co.yield_(InterruptDataVariant::Call(Call { message: msg }))
+                $co.yield_(InterruptDataVariant::Call(Call::Call(msg)))
                     .await,
             )
             .unwrap()
@@ -162,7 +162,7 @@ macro_rules! do_create {
         use $crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
-            CallKind, Message,
+            CreateMessage,
         };
 
         if $state.message.is_static {
@@ -176,7 +176,7 @@ macro_rules! do_create {
         let region = memory::verify_memory_region($state, init_code_offset, init_code_size)
             .map_err(|_| StatusCode::OutOfGas)?;
 
-        let call_kind = if $create2 {
+        let salt = if $create2 {
             let salt = $state.stack.pop();
 
             if let Some(region) = &region {
@@ -187,11 +187,9 @@ macro_rules! do_create {
                 }
             }
 
-            CallKind::Create2 {
-                salt: H256(salt.into()),
-            }
+            Some(H256(salt.into()))
         } else {
-            CallKind::Create
+            None
         };
 
         $state.stack.push(U256::zero());
@@ -209,18 +207,15 @@ macro_rules! do_create {
                 .balance
                     < endowment)
         {
-            let msg = Message {
+            let msg = CreateMessage {
                 gas: if $state.evm_revision >= Revision::Tangerine {
                     $state.gas_left - $state.gas_left / 64
                 } else {
                     $state.gas_left
                 },
 
-                is_static: false,
-                destination: Address::zero(),
-
-                kind: call_kind,
-                input_data: if !init_code_size.is_zero() {
+                salt,
+                initcode: if !init_code_size.is_zero() {
                     $state.memory[init_code_offset.as_usize()
                         ..init_code_offset.as_usize() + init_code_size.as_usize()]
                         .to_vec()
@@ -230,11 +225,11 @@ macro_rules! do_create {
                 },
                 sender: $state.message.destination,
                 depth: $state.message.depth + 1,
-                value: endowment,
+                endowment,
             };
             let msg_gas = msg.gas;
             let result = ResumeDataVariant::into_call_output(
-                $co.yield_(InterruptDataVariant::Call(Call { message: msg }))
+                $co.yield_(InterruptDataVariant::Call(Call::Create(msg)))
                     .await,
             )
             .unwrap()

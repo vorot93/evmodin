@@ -7,7 +7,7 @@ use crate::{
     tracing::Tracer,
     *,
 };
-use ethereum_types::{Address, U256};
+use ethereum_types::U256;
 use genawaiter::sync::*;
 use std::sync::Arc;
 
@@ -223,7 +223,11 @@ impl ExecutionStartInterrupt {
                     i.resume(())
                 }
                 InterruptVariant::Call(i) => {
-                    let output = host.call(&i.data().message);
+                    let message = match i.data() {
+                        Call::Call(message) => message.clone(),
+                        Call::Create(message) => message.clone().into(),
+                    };
+                    let output = host.call(&message);
                     i.resume(CallOutput { output })
                 }
                 InterruptVariant::GetTxContext(i) => {
