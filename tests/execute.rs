@@ -368,6 +368,32 @@ fn jump_over_jumpdest() {
 }
 
 #[test]
+fn jump_to_missing_push_data() {
+    EvmTester::new()
+        .code(
+            Bytecode::new()
+                .pushv(5)
+                .opcode(OpCode::JUMP)
+                .opcode(OpCode::PUSH1),
+        )
+        .status(StatusCode::BadJumpDestination)
+        .check()
+}
+#[test]
+fn jump_to_missing_push_data2() {
+    EvmTester::new()
+        .code(
+            Bytecode::new()
+                .pushv(6)
+                .opcode(OpCode::JUMP)
+                .opcode(OpCode::PUSH2)
+                .append(hex!("ef")),
+        )
+        .status(StatusCode::BadJumpDestination)
+        .check()
+}
+
+#[test]
 fn pc_sum() {
     EvmTester::new()
         .code(
