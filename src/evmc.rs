@@ -128,7 +128,7 @@ impl From<evmc_status_code> for StatusCode {
             evmc_status_code::EVMC_STATIC_MODE_VIOLATION => StatusCode::StaticModeViolation,
             evmc_status_code::EVMC_PRECOMPILE_FAILURE => StatusCode::PrecompileFailure,
             evmc_status_code::EVMC_CONTRACT_VALIDATION_FAILURE => {
-                StatusCode::InternalError("ContractValidationFailure".into())
+                StatusCode::ContractValidationFailure
             }
             evmc_status_code::EVMC_ARGUMENT_OUT_OF_RANGE => StatusCode::ArgumentOutOfRange,
             evmc_status_code::EVMC_WASM_UNREACHABLE_INSTRUCTION => {
@@ -159,6 +159,9 @@ impl From<StatusCode> for evmc_status_code {
             StatusCode::CallDepthExceeded => evmc_status_code::EVMC_CALL_DEPTH_EXCEEDED,
             StatusCode::StaticModeViolation => evmc_status_code::EVMC_STATIC_MODE_VIOLATION,
             StatusCode::PrecompileFailure => evmc_status_code::EVMC_PRECOMPILE_FAILURE,
+            StatusCode::ContractValidationFailure => {
+                evmc_status_code::EVMC_CONTRACT_VALIDATION_FAILURE
+            }
             StatusCode::ArgumentOutOfRange => evmc_status_code::EVMC_ARGUMENT_OUT_OF_RANGE,
             StatusCode::InsufficientBalance => evmc_status_code::EVMC_INSUFFICIENT_BALANCE,
             StatusCode::InternalError(_) => evmc_status_code::EVMC_INTERNAL_ERROR,

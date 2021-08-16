@@ -136,6 +136,10 @@ pub enum StatusCode {
     #[strum(serialize = "precompile failure")]
     PrecompileFailure,
 
+    /// Contract validation has failed.
+    #[strum(serialize = "contract validation failure")]
+    ContractValidationFailure,
+
     /// An argument to a state accessing method has a value outside of the
     /// accepted range of values.
     #[strum(serialize = "argument out of range")]
