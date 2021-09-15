@@ -16,7 +16,7 @@ pub(crate) fn callvalue(state: &mut ExecutionState) {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! balance {
-    ($co:expr, $state:expr) => {
+    ($state:expr) => {
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -27,12 +27,9 @@ macro_rules! balance {
         let address = u256_to_address($state.stack.pop());
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeDataVariant::into_access_account_status(
-                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
-                    address,
-                }))
-                .await,
-            )
+            let access_status = ResumeDataVariant::into_access_account_status({
+                yield InterruptDataVariant::AccessAccount(AccessAccount { address })
+            })
             .unwrap()
             .status;
             if access_status == AccessStatus::Cold {
@@ -43,10 +40,9 @@ macro_rules! balance {
             }
         }
 
-        let balance = ResumeDataVariant::into_balance(
-            $co.yield_(InterruptDataVariant::GetBalance(GetBalance { address }))
-                .await,
-        )
+        let balance = ResumeDataVariant::into_balance({
+            yield InterruptDataVariant::GetBalance(GetBalance { address })
+        })
         .unwrap()
         .balance;
 
@@ -57,7 +53,7 @@ macro_rules! balance {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! extcodesize {
-    ($co:expr, $state:expr) => {
+    ($state:expr) => {
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -68,12 +64,9 @@ macro_rules! extcodesize {
         let address = u256_to_address($state.stack.pop());
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_account = ResumeDataVariant::into_access_account_status(
-                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
-                    address,
-                }))
-                .await,
-            )
+            let access_account = ResumeDataVariant::into_access_account_status({
+                yield InterruptDataVariant::AccessAccount(AccessAccount { address })
+            })
             .unwrap()
             .status;
             if access_account == AccessStatus::Cold {
@@ -84,10 +77,9 @@ macro_rules! extcodesize {
             }
         }
 
-        let code_size = ResumeDataVariant::into_code_size(
-            $co.yield_(InterruptDataVariant::GetCodeSize(GetCodeSize { address }))
-                .await,
-        )
+        let code_size = ResumeDataVariant::into_code_size({
+            yield InterruptDataVariant::GetCodeSize(GetCodeSize { address })
+        })
         .unwrap()
         .code_size;
         $state.stack.push(code_size);
@@ -97,14 +89,13 @@ macro_rules! extcodesize {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! push_txcontext {
-    ($co:expr, $state:expr, $accessor:expr) => {
+    ($state:expr, $accessor:expr) => {
         use $crate::continuation::{interrupt_data::*, resume_data::*};
 
-        let tx_context = ResumeDataVariant::into_tx_context_data(
-            $co.yield_(InterruptDataVariant::GetTxContext).await,
-        )
-        .unwrap()
-        .context;
+        let tx_context =
+            ResumeDataVariant::into_tx_context_data({ yield InterruptDataVariant::GetTxContext })
+                .unwrap()
+                .context;
 
         $state.stack.push($accessor(tx_context));
     };
@@ -149,15 +140,14 @@ pub(crate) fn basefee_accessor(tx_context: TxContext) -> U256 {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! selfbalance {
-    ($co:expr, $state:expr) => {{
+    ($state:expr) => {{
         use $crate::continuation::{interrupt_data::*, resume_data::*};
 
-        let balance = ResumeDataVariant::into_balance(
-            $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
+        let balance = ResumeDataVariant::into_balance({
+            yield InterruptDataVariant::GetBalance(GetBalance {
                 address: $state.message.recipient,
-            }))
-            .await,
-        )
+            })
+        })
         .unwrap()
         .balance;
 
@@ -168,29 +158,25 @@ macro_rules! selfbalance {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! blockhash {
-    ($co:expr, $state:expr) => {
+    ($state:expr) => {
         use $crate::continuation::{interrupt_data::*, resume_data::*};
 
         let number = $state.stack.pop();
 
-        let upper_bound = ResumeDataVariant::into_tx_context_data(
-            $co.yield_(InterruptDataVariant::GetTxContext).await,
-        )
-        .unwrap()
-        .context
-        .block_number;
+        let upper_bound =
+            ResumeDataVariant::into_tx_context_data({ yield InterruptDataVariant::GetTxContext })
+                .unwrap()
+                .context
+                .block_number;
         let lower_bound = upper_bound.saturating_sub(256);
 
         let mut header = U256::zero();
         if number <= u64::MAX.into() {
             let n = number.as_u64();
             if (lower_bound..upper_bound).contains(&n) {
-                header = ResumeDataVariant::into_block_hash(
-                    $co.yield_(InterruptDataVariant::GetBlockHash(GetBlockHash {
-                        block_number: n,
-                    }))
-                    .await,
-                )
+                header = ResumeDataVariant::into_block_hash({
+                    yield InterruptDataVariant::GetBlockHash(GetBlockHash { block_number: n })
+                })
                 .unwrap()
                 .hash;
             }
@@ -203,7 +189,7 @@ macro_rules! blockhash {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! do_log {
-    ($co:expr, $state:expr, $num_topics:expr) => {{
+    ($state:expr, $num_topics:expr) => {{
         use arrayvec::ArrayVec;
         use $crate::continuation::{interrupt_data::*, resume_data::*};
 
@@ -235,13 +221,15 @@ macro_rules! do_log {
         } else {
             &[]
         };
-        let r = $co
-            .yield_(InterruptDataVariant::EmitLog(EmitLog {
+
+        let data = data.to_vec().into();
+        let r = {
+            yield InterruptDataVariant::EmitLog(EmitLog {
                 address: $state.message.recipient,
-                data: data.to_vec().into(),
+                data,
                 topics,
-            }))
-            .await;
+            })
+        };
 
         assert!(matches!(r, ResumeDataVariant::Empty));
     }};
@@ -250,7 +238,7 @@ macro_rules! do_log {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! sload {
-    ($co:expr, $state:expr) => {{
+    ($state:expr) => {{
         use $crate::{
             continuation::{interrupt_data::*, resume_data::*},
             host::*,
@@ -260,13 +248,12 @@ macro_rules! sload {
         let key = $state.stack.pop();
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeDataVariant::into_access_storage_status(
-                $co.yield_(InterruptDataVariant::AccessStorage(AccessStorage {
+            let access_status = ResumeDataVariant::into_access_storage_status({
+                yield InterruptDataVariant::AccessStorage(AccessStorage {
                     address: $state.message.recipient,
                     key,
-                }))
-                .await,
-            )
+                })
+            })
             .unwrap()
             .status;
             if access_status == AccessStatus::Cold {
@@ -280,13 +267,12 @@ macro_rules! sload {
             }
         }
 
-        let storage = ResumeDataVariant::into_storage_value(
-            $co.yield_(InterruptDataVariant::GetStorage(GetStorage {
+        let storage = ResumeDataVariant::into_storage_value({
+            yield InterruptDataVariant::GetStorage(GetStorage {
                 address: $state.message.recipient,
                 key,
-            }))
-            .await,
-        )
+            })
+        })
         .unwrap()
         .value;
 
@@ -297,7 +283,7 @@ macro_rules! sload {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! sstore {
-    ($co:expr, $state:expr) => {{
+    ($state:expr) => {{
         use $crate::{
             continuation::{interrupt_data::*, resume_data::*},
             host::*,
@@ -317,13 +303,12 @@ macro_rules! sstore {
 
         let mut cost = 0;
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeDataVariant::into_access_storage_status(
-                $co.yield_(InterruptDataVariant::AccessStorage(AccessStorage {
+            let access_status = ResumeDataVariant::into_access_storage_status({
+                yield InterruptDataVariant::AccessStorage(AccessStorage {
                     address: $state.message.recipient,
                     key,
-                }))
-                .await,
-            )
+                })
+            })
             .unwrap()
             .status;
 
@@ -332,14 +317,13 @@ macro_rules! sstore {
             }
         }
 
-        let status = ResumeDataVariant::into_storage_status_info(
-            $co.yield_(InterruptDataVariant::SetStorage(SetStorage {
+        let status = ResumeDataVariant::into_storage_status_info({
+            yield InterruptDataVariant::SetStorage(SetStorage {
                 address: $state.message.recipient,
                 key,
                 value,
-            }))
-            .await,
-        )
+            })
+        })
         .unwrap()
         .status;
 
@@ -374,7 +358,7 @@ macro_rules! sstore {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! selfdestruct {
-    ($co:expr, $state:expr) => {{
+    ($state:expr) => {{
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -389,12 +373,11 @@ macro_rules! selfdestruct {
         let beneficiary = u256_to_address($state.stack.pop());
 
         if $state.evm_revision >= Revision::Berlin {
-            let access_status = ResumeDataVariant::into_access_account_status(
-                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
+            let access_status = ResumeDataVariant::into_access_account_status({
+                yield InterruptDataVariant::AccessAccount(AccessAccount {
                     address: beneficiary,
-                }))
-                .await,
-            )
+                })
+            })
             .unwrap()
             .status;
             if access_status == AccessStatus::Cold {
@@ -408,12 +391,11 @@ macro_rules! selfdestruct {
         if $state.evm_revision >= Revision::Tangerine
             && ($state.evm_revision == Revision::Tangerine
                 || !{
-                    ResumeDataVariant::into_balance(
-                        $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
+                    ResumeDataVariant::into_balance({
+                        yield InterruptDataVariant::GetBalance(GetBalance {
                             address: $state.message.recipient,
-                        }))
-                        .await,
-                    )
+                        })
+                    })
                     .unwrap()
                     .balance
                     .is_zero()
@@ -421,12 +403,11 @@ macro_rules! selfdestruct {
         {
             // After TANGERINE_WHISTLE apply additional cost of
             // sending value to a non-existing account.
-            if !ResumeDataVariant::into_account_exists_status(
-                $co.yield_(InterruptDataVariant::AccountExists(AccountExists {
+            if !ResumeDataVariant::into_account_exists_status({
+                yield InterruptDataVariant::AccountExists(AccountExists {
                     address: beneficiary,
-                }))
-                .await,
-            )
+                })
+            })
             .unwrap()
             .exists
             {
@@ -438,11 +419,10 @@ macro_rules! selfdestruct {
         }
 
         assert!(matches!(
-            $co.yield_(InterruptDataVariant::Selfdestruct(Selfdestruct {
+            yield InterruptDataVariant::Selfdestruct(Selfdestruct {
                 address: $state.message.recipient,
                 beneficiary,
-            }))
-            .await,
+            }),
             ResumeDataVariant::Empty
         ));
     }};

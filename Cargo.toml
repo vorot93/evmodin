@@ -15,7 +15,6 @@ evmc-declare = { git = "https://github.com/ethereum/evmc", tag = "v10.0.0-alpha.
 evmc-vm = { git = "https://github.com/ethereum/evmc", tag = "v10.0.0-alpha.1", optional = true }
 i256 = { git = "https://github.com/vorot93/rust-i256" }
 ethereum-types = { version = "0.12", default-features = false }
-genawaiter = { git = "https://github.com/cuviper/genawaiter", branch = "unhacked" }
 getset = "0.1"
 hex = "0.4"
 hex-literal = { version = "0.3", optional = true }

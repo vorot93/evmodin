@@ -9,8 +9,8 @@ use arrayvec::ArrayVec;
 use derive_more::From;
 use enum_as_inner::EnumAsInner;
 use ethereum_types::*;
-use genawaiter::{Coroutine, GeneratorState};
-use std::{convert::Infallible, pin::Pin};
+use std::ops::GeneratorState;
+use std::{convert::Infallible, ops::Generator, pin::Pin};
 
 mod sealed {
     pub trait Sealed {}
@@ -38,9 +38,9 @@ pub trait Interrupt: sealed::Sealed {
 
 type InnerCoroutine = Pin<
     Box<
-        dyn Coroutine<
+        dyn Generator<
+                ResumeDataVariant,
                 Yield = InterruptDataVariant,
-                Resume = ResumeDataVariant,
                 Return = Result<SuccessfulOutput, StatusCode>,
             > + Send
             + Sync
@@ -49,7 +49,7 @@ type InnerCoroutine = Pin<
 >;
 
 fn resume_interrupt(mut inner: InnerCoroutine, resume_data: ResumeDataVariant) -> InterruptVariant {
-    match Pin::new(&mut *inner).resume_with(resume_data) {
+    match Pin::new(&mut *inner).resume(resume_data) {
         GeneratorState::Yielded(interrupt) => match interrupt {
             InterruptDataVariant::InstructionStart(data) => {
                 InstructionStartInterrupt { inner, data }.into()
