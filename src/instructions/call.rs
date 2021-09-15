@@ -1,7 +1,7 @@
 #[doc(hidden)]
 #[macro_export]
 macro_rules! do_call {
-    ($co:expr, $state:expr, $kind:expr, $is_static:expr) => {{
+    ($state:expr, $kind:expr, $is_static:expr) => {{
         use std::cmp::min;
         use $crate::{
             common::u256_to_address,
@@ -28,10 +28,7 @@ macro_rules! do_call {
 
         if $state.evm_revision >= Revision::Berlin
             && ResumeDataVariant::into_access_account_status(
-                $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
-                    address: dst,
-                }))
-                .await,
+                yield InterruptDataVariant::AccessAccount(AccessAccount { address: dst }),
             )
             .unwrap()
             .status
@@ -84,12 +81,9 @@ macro_rules! do_call {
             }
 
             if (has_value || $state.evm_revision < Revision::Spurious)
-                && !ResumeDataVariant::into_account_exists_status(
-                    $co.yield_(InterruptDataVariant::AccountExists(AccountExists {
-                        address: dst,
-                    }))
-                    .await,
-                )
+                && !ResumeDataVariant::into_account_exists_status({
+                    yield InterruptDataVariant::AccountExists(AccountExists { address: dst })
+                })
                 .unwrap()
                 .exists
             {
@@ -121,21 +115,19 @@ macro_rules! do_call {
 
         if $state.message.depth < 1024
             && !(has_value
-                && ResumeDataVariant::into_balance(
-                    $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
+                && ResumeDataVariant::into_balance({
+                    yield InterruptDataVariant::GetBalance(GetBalance {
                         address: $state.message.recipient,
-                    }))
-                    .await,
-                )
+                    })
+                })
                 .unwrap()
                 .balance
                     < value)
         {
             let msg_gas = msg.gas;
-            let result = ResumeDataVariant::into_call_output(
-                $co.yield_(InterruptDataVariant::Call(Call::Call(msg)))
-                    .await,
-            )
+            let result = ResumeDataVariant::into_call_output({
+                yield InterruptDataVariant::Call(Call::Call(msg))
+            })
             .unwrap()
             .output;
             $state.return_data = result.output_data.clone();
@@ -162,7 +154,7 @@ macro_rules! do_call {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! do_create {
-    ($co:expr, $state:expr, $create2:expr) => {{
+    ($state:expr, $create2:expr) => {{
         use ethereum_types::U256;
         use $crate::{
             common::*,
@@ -202,12 +194,11 @@ macro_rules! do_create {
 
         if $state.message.depth < 1024
             && !(!endowment.is_zero()
-                && ResumeDataVariant::into_balance(
-                    $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
+                && ResumeDataVariant::into_balance({
+                    yield InterruptDataVariant::GetBalance(GetBalance {
                         address: $state.message.recipient,
-                    }))
-                    .await,
-                )
+                    })
+                })
                 .unwrap()
                 .balance
                     < endowment)
@@ -233,10 +224,9 @@ macro_rules! do_create {
                 endowment,
             };
             let msg_gas = msg.gas;
-            let result = ResumeDataVariant::into_call_output(
-                $co.yield_(InterruptDataVariant::Call(Call::Create(msg)))
-                    .await,
-            )
+            let result = ResumeDataVariant::into_call_output({
+                yield InterruptDataVariant::Call(Call::Create(msg))
+            })
             .unwrap()
             .output;
             $state.gas_left -= msg_gas - result.gas_left;

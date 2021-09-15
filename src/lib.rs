@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+#![feature(generators, generator_trait)]
+
 use bytes::Bytes;
 pub use common::{
     CallKind, CreateMessage, Message, Output, Revision, StatusCode, SuccessfulOutput,
