@@ -392,7 +392,7 @@ macro_rules! selfdestruct {
 
         let beneficiary = u256_to_address($state.stack.pop());
 
-        if $state.evm_revision >= Revision::Berlin {
+        if $state.config.has_access_list {
             let access_status = ResumeDataVariant::into_access_account_status(
                 $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
                     address: beneficiary,
@@ -409,8 +409,10 @@ macro_rules! selfdestruct {
             }
         }
 
-        if $state.evm_revision >= Revision::Tangerine
-            && ($state.evm_revision == Revision::Tangerine
+        // let extra_cost =
+
+        if $state.config.gas_suicide_new_account > 0
+            && ($state.config.gas_suicide_new_account_apply_always
                 || !{
                     ResumeDataVariant::into_balance(
                         $co.yield_(InterruptDataVariant::GetBalance(GetBalance {

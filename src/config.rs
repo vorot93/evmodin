@@ -1,10 +1,10 @@
 use crate::{instructions::properties::WARM_STORAGE_READ_COST, Revision};
 
 /// Runtime configuration.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     /// Gas paid for extcode.
-    pub gas_ext_code: u64,
+    pub gas_ext_code_size: u64,
     /// Gas paid for extcodecopy
     pub gas_ext_code_copy: u64,
     /// Gas paid for extcodehash.
@@ -23,6 +23,7 @@ pub struct Config {
     pub gas_suicide: u64,
     /// Gas paid for SUICIDE opcode when it hits a new account.
     pub gas_suicide_new_account: u64,
+    pub gas_suicide_new_account_apply_always: bool,
     /// Gas paid for CALL opcode.
     pub gas_call: u64,
     /// Gas paid for EXP opcode for every byte.
@@ -55,8 +56,6 @@ pub struct Config {
     pub call_stack_limit: usize,
     /// Create contract limit.
     pub create_contract_limit: Option<usize>,
-    /// Call stipend.
-    pub call_stipend: u64,
     /// Has delegate call.
     pub has_delegate_call: bool,
     /// Has create2.
@@ -85,7 +84,7 @@ impl Config {
     /// Frontier hard fork configuration.
     pub const fn frontier() -> Self {
         Self {
-            gas_ext_code: 20,
+            gas_ext_code_size: 20,
             gas_ext_code_copy: 20,
             gas_ext_code_hash: 20,
             gas_balance: 20,
@@ -95,6 +94,7 @@ impl Config {
             refund_sstore_clears: 15000,
             gas_suicide: 0,
             gas_suicide_new_account: 0,
+            gas_suicide_new_account_apply_always: false,
             gas_call: 40,
             gas_expbyte: 10,
             gas_transaction_create: 21000,
@@ -110,7 +110,6 @@ impl Config {
             memory_limit: usize::MAX,
             call_stack_limit: 1024,
             create_contract_limit: None,
-            call_stipend: 2300,
             has_delegate_call: false,
             has_create2: false,
             has_revert: false,
@@ -137,13 +136,14 @@ impl Config {
     /// Tangerine hard fork configuration.
     pub const fn tangerine() -> Self {
         Self {
-            gas_ext_code: 700,
+            gas_ext_code_size: 700,
             gas_ext_code_copy: 700,
             gas_balance: 400,
             gas_sload: 200,
             gas_call: 700,
             gas_suicide: 5000,
             gas_suicide_new_account: 25000,
+            gas_suicide_new_account_apply_always: true,
             gas_create_divisor: Some(64),
             ..Self::homestead()
         }
@@ -152,6 +152,8 @@ impl Config {
     /// Spurious hard fork configuration.
     pub const fn spurious() -> Self {
         Self {
+            gas_suicide_new_account_apply_always: false,
+            gas_expbyte: 50,
             create_contract_limit: Some(0x6000),
             ..Self::tangerine()
         }
@@ -198,7 +200,7 @@ impl Config {
 
     pub const fn berlin() -> Self {
         Self {
-            gas_ext_code: WARM_STORAGE_READ_COST as u64,
+            gas_ext_code_size: WARM_STORAGE_READ_COST as u64,
             gas_ext_code_copy: WARM_STORAGE_READ_COST as u64,
             gas_ext_code_hash: WARM_STORAGE_READ_COST as u64,
             gas_balance: WARM_STORAGE_READ_COST as u64,

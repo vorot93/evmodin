@@ -1,4 +1,4 @@
-use crate::common::{Message, Revision};
+use crate::{common::Message, Config};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::U256;
@@ -64,20 +64,20 @@ pub struct ExecutionState {
     #[getset(get = "pub", get_mut = "pub")]
     pub(crate) memory: Memory,
     pub(crate) message: Message,
-    pub(crate) evm_revision: Revision,
+    pub(crate) config: Config,
     #[getset(get = "pub", get_mut = "pub")]
     pub(crate) return_data: Bytes,
     pub(crate) output_data: Bytes,
 }
 
 impl ExecutionState {
-    pub fn new(message: Message, evm_revision: Revision) -> Self {
+    pub fn new(message: Message, config: Config) -> Self {
         Self {
             gas_left: message.gas,
             stack: Default::default(),
             memory: Memory::with_capacity(4 * 1024),
             message,
-            evm_revision,
+            config,
             return_data: Default::default(),
             output_data: Bytes::new(),
         }

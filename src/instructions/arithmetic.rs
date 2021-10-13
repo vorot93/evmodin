@@ -1,4 +1,4 @@
-use crate::{state::*, Revision, StatusCode};
+use crate::{state::*, StatusCode};
 use core::convert::TryInto;
 use ethereum_types::{U256, U512};
 use i256::I256;
@@ -109,11 +109,7 @@ pub(crate) fn exp(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let mut power = state.stack.pop();
 
     if !power.is_zero() {
-        let additional_gas = if state.evm_revision >= Revision::Spurious {
-            50
-        } else {
-            10
-        } * (log2floor(power) / 8 + 1);
+        let additional_gas = state.config.gas_expbyte * (log2floor(power) / 8 + 1);
 
         state.gas_left -= additional_gas as i64;
 

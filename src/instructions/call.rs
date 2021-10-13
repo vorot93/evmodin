@@ -26,7 +26,7 @@ macro_rules! do_call {
 
         $state.stack.push(U256::zero()); // Assume failure.
 
-        if $state.evm_revision >= Revision::Berlin
+        if $state.config.has_access_list
             && ResumeDataVariant::into_access_account_status(
                 $co.yield_(InterruptDataVariant::AccessAccount(AccessAccount {
                     address: dst,
@@ -100,7 +100,7 @@ macro_rules! do_call {
             msg.gas = gas.as_usize() as i64;
         }
 
-        if $state.evm_revision >= Revision::Tangerine {
+        if !$state.config.err_on_call_with_more_gas {
             // TODO: Always true for STATICCALL.
             msg.gas = min(msg.gas, $state.gas_left - $state.gas_left / 64);
         } else if msg.gas > $state.gas_left {

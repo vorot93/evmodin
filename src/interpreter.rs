@@ -280,7 +280,7 @@ async fn interpreter_producer(
 ) -> Result<SuccessfulOutput, StatusCode> {
     let state = &mut state;
 
-    let instruction_table = get_baseline_instruction_table(state.evm_revision);
+    let instruction_table = build_instruction_table(state.config);
 
     let mut reverted = false;
 
