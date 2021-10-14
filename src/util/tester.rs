@@ -231,12 +231,12 @@ impl EvmTester {
         );
 
         if let Some(status_codes) = self.expected_status_codes {
-            if !status_codes.iter().any(|s| *s == output.status_code) {
-                panic!(
-                    "Status code mismatch: {}, but must be one of {:?}",
-                    output.status_code, status_codes
-                );
-            }
+            assert!(
+                status_codes.iter().any(|s| *s == output.status_code),
+                "Status code mismatch: {}, but must be one of {:?}",
+                output.status_code,
+                status_codes
+            );
         }
 
         if let Some(gas_check) = self.gas_check {
