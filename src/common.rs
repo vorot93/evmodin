@@ -4,7 +4,7 @@ use serde::Serialize;
 use strum_macros::Display;
 
 /// EVM revision.
-#[derive(Clone, Copy, Debug, Display, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Copy, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub enum Revision {
     /// The Frontier revision.
     /// The one Ethereum launched with.
