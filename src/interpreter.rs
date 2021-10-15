@@ -105,8 +105,7 @@ impl AnalyzedCode {
         let code_len = code.len();
 
         let mut padded_code = code;
-        padded_code.resize(i + 1, 0);
-        padded_code[i] = OpCode::STOP.to_u8();
+        padded_code.resize(i + 1, OpCode::STOP.to_u8());
 
         let jumpdest_map = JumpdestMap(jumpdest_map.into());
         let padded_code = Bytes::from(padded_code);
