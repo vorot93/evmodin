@@ -535,11 +535,9 @@ async fn interpreter_producer(
             | OpCode::PUSH30
             | OpCode::PUSH31
             | OpCode::PUSH32 => {
-                pc += load_push(
-                    &mut state.stack,
-                    &s.padded_code[pc + 1..],
-                    op.to_usize() - OpCode::PUSH1.to_usize() + 1,
-                )
+                let push_len = op.push_size().unwrap().into();
+                push(&mut state.stack, &s.padded_code[pc + 1..], push_len);
+                pc += push_len;
             }
 
             OpCode::DUP1
