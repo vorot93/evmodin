@@ -390,7 +390,7 @@ fn call_with_value() {
         .code(hex!("60ff600060ff6000600160aa618000f150"))
         .destination(call_sender)
         .apply_host_fn(move |host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
             host.accounts.entry(call_dst).or_default();
             host.call_result.gas_left = 1.into();
         })
@@ -398,19 +398,14 @@ fn call_with_value() {
         .gas_used(7447 + 32082)
         .status(StatusCode::Success)
         .inspect_host(move |host, _| {
-            assert_eq!(
-                host.recorded.lock().calls,
-                [Message {
-                    kind: CallKind::Call,
-                    is_static: false,
-                    depth: 1,
-                    gas: 32083,
-                    destination: call_dst,
-                    sender: call_sender,
-                    input_data: vec![0; 255].into(),
-                    value: 1.into(),
-                }]
-            );
+            let r = host.recorded.lock();
+            assert_eq!(r.calls.len(), 1);
+            let call_msg = &r.calls[0];
+            assert_eq!(call_msg.kind, CallKind::Call);
+            assert_eq!(call_msg.depth, 1);
+            assert_eq!(call_msg.gas, 32083);
+            assert_eq!(call_msg.recipient, call_dst);
+            assert_eq!(call_msg.sender, call_sender);
         })
         .check()
 }
@@ -593,19 +588,18 @@ fn call_value_zero_to_nonexistent_account() {
         .gas_used(729 + (call_gas - gas_left))
         .status(StatusCode::Success)
         .inspect_host(|host, _| {
+            let recorded = host.recorded.lock();
+            assert_eq!(recorded.calls.len(), 1);
+            let call_msg = &recorded.calls[0];
+            assert_eq!(call_msg.kind, CallKind::Call);
+            assert_eq!(call_msg.depth, 1);
+            assert_eq!(call_msg.gas, 6000);
+            assert_eq!(call_msg.input_data.len(), 64);
             assert_eq!(
-                host.recorded.lock().calls,
-                [Message {
-                    kind: CallKind::Call,
-                    is_static: false,
-                    depth: 1,
-                    gas: 6000,
-                    destination: hex!("00000000000000000000000000000000000000aa").into(),
-                    sender: Address::zero(),
-                    input_data: vec![0; 64].into(),
-                    value: 0.into(),
-                }]
+                call_msg.recipient,
+                hex!("00000000000000000000000000000000000000aa").into()
             );
+            assert_eq!(call_msg.value, 0.into());
         })
         .check()
 }
@@ -634,7 +628,7 @@ fn call_new_account_creation_cost() {
     t.clone()
         .revision(Revision::Tangerine)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 0.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 0.into();
         })
         .input(&hex!("00") as &[u8])
         .status(StatusCode::Success)
@@ -654,32 +648,27 @@ fn call_new_account_creation_cost() {
     t.clone()
         .revision(Revision::Tangerine)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
         })
         .input(&hex!("0000000000000000000000000000000000000000000000000000000000000001") as &[u8])
         .status(StatusCode::Success)
         .gas_used(25000 + 9000 + 739)
         .output_value(1)
         .inspect_host(move |host, msg| {
+            let r = host.recorded.lock();
+            assert_eq!(r.calls.len(), 1);
+            let call_msg = &r.calls[0];
+            assert_eq!(call_msg.recipient, call_dst);
+            assert_eq!(call_msg.gas, 2300);
+            assert_eq!(call_msg.sender, destination);
+            assert_eq!(call_msg.value, 1.into());
+            assert_eq!(call_msg.input_data, Bytes::new());
             assert_eq!(
-                host.recorded.lock().calls,
-                [Message {
-                    kind: CallKind::Call,
-                    is_static: false,
-                    depth: 1,
-                    gas: 2300,
-                    destination: call_dst,
-                    sender: destination,
-                    input_data: vec![].into(),
-                    value: 1.into(),
-                }]
-            );
-            assert_eq!(
-                host.recorded.lock().account_accesses,
+                r.account_accesses,
                 [
-                    call_dst,        // Account exist?
-                    msg.destination, // Balance.
-                    call_dst         // Call.
+                    call_dst,      // Account exist?
+                    msg.recipient, // Balance.
+                    call_dst       // Call.
                 ]
             )
         })
@@ -688,28 +677,23 @@ fn call_new_account_creation_cost() {
     t.clone()
         .revision(Revision::Spurious)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 0.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 0.into();
         })
         .input(&hex!("00") as &[u8])
         .status(StatusCode::Success)
         .gas_used(739)
         .output_value(1)
         .inspect_host(move |host, _| {
+            let r = host.recorded.lock();
+            assert_eq!(r.calls.len(), 1);
+            let call_msg = &r.calls[0];
+            assert_eq!(call_msg.recipient, call_dst);
+            assert_eq!(call_msg.gas, 0);
+            assert_eq!(call_msg.sender, destination);
+            assert_eq!(call_msg.value, 0.into());
+            assert_eq!(call_msg.input_data, Bytes::new());
             assert_eq!(
-                host.recorded.lock().calls,
-                [Message {
-                    kind: CallKind::Call,
-                    is_static: false,
-                    depth: 1,
-                    gas: 0,
-                    destination: call_dst,
-                    sender: destination,
-                    input_data: vec![].into(),
-                    value: 0.into(),
-                }]
-            );
-            assert_eq!(
-                host.recorded.lock().account_accesses,
+                r.account_accesses,
                 [
                 call_dst         // Call.
             ]
@@ -719,32 +703,27 @@ fn call_new_account_creation_cost() {
 
     t.revision(Revision::Spurious)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
         })
         .input(&hex!("0000000000000000000000000000000000000000000000000000000000000001") as &[u8])
         .status(StatusCode::Success)
         .gas_used(25000 + 9000 + 739)
         .output_value(1)
         .inspect_host(move |host, msg| {
+            let r = host.recorded.lock();
+            assert_eq!(r.calls.len(), 1);
+            let call_msg = &r.calls[0];
+            assert_eq!(call_msg.recipient, call_dst);
+            assert_eq!(call_msg.gas, 2300);
+            assert_eq!(call_msg.sender, destination);
+            assert_eq!(call_msg.value, 1.into());
+            assert_eq!(call_msg.input_data, Bytes::new());
             assert_eq!(
-                host.recorded.lock().calls,
-                [Message {
-                    kind: CallKind::Call,
-                    is_static: false,
-                    depth: 1,
-                    gas: 2300,
-                    destination: call_dst,
-                    sender: destination,
-                    input_data: vec![].into(),
-                    value: 1.into(),
-                }]
-            );
-            assert_eq!(
-                host.recorded.lock().account_accesses,
+                r.account_accesses,
                 [
-                    call_dst,        // Account exist?
-                    msg.destination, // Balance.
-                    call_dst         // Call.
+                    call_dst,      // Account exist?
+                    msg.recipient, // Balance.
+                    call_dst       // Call.
                 ]
             )
         })
@@ -759,7 +738,7 @@ fn callcode_new_account_create() {
     EvmTester::new()
         .destination(call_sender)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
             host.call_result.gas_left = 1;
         })
         .gas(100000)
@@ -767,19 +746,14 @@ fn callcode_new_account_create() {
         .gas_used(59722)
         .status(StatusCode::Success)
         .inspect_host(move |host, _| {
-            assert_eq!(
-                host.recorded.lock().calls,
-                [Message {
-                    kind: CallKind::CallCode,
-                    is_static: false,
-                    depth: 1,
-                    gas: 52300,
-                    destination: Address::zero(),
-                    sender: call_sender,
-                    input_data: vec![].into(),
-                    value: 1.into(),
-                }]
-            );
+            let recorded = host.recorded.lock();
+            assert_eq!(recorded.calls.len(), 1);
+            let call_msg = &recorded.calls[0];
+            assert_eq!(call_msg.kind, CallKind::CallCode);
+            assert_eq!(call_msg.depth, 1);
+            assert_eq!(call_msg.gas, 52_300);
+            assert_eq!(call_msg.sender, call_sender);
+            assert_eq!(call_msg.value, 1.into());
         })
         .check()
 }

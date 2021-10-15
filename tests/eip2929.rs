@@ -19,7 +19,7 @@ fn eip2929_case1() {
                 host.recorded.lock().account_accesses,
                 [
                     msg.sender,
-                    msg.destination,
+                    msg.recipient,
                     hex!("0000000000000000000000000000000000000001").into(),
                     hex!("0000000000000000000000000000000000000001").into(),
                     hex!("0000000000000000000000000000000000000002").into(),
@@ -40,8 +40,8 @@ fn eip2929_case1() {
                     hex!("00000000000000000000000000000000000000f1").into(),
                     hex!("0000000000000000000000000000000000000000").into(),
                     hex!("0000000000000000000000000000000000000000").into(),
-                    msg.destination,
-                    msg.destination,
+                    msg.recipient,
+                    msg.recipient,
                 ]
             );
         })
@@ -66,10 +66,10 @@ fn eip2929_case2() {
                 host.recorded.lock().account_accesses,
                 [
                     msg.sender,
-                    msg.destination,
+                    msg.recipient,
                     hex!("00000000000000000000000000000000000000ff").into(),
                     hex!("00000000000000000000000000000000000000ff").into(),
-                    msg.destination,
+                    msg.recipient,
                 ]
             );
         })
@@ -164,7 +164,7 @@ fn eip2929_sload_cold() {
         .apply_host_fn(move |host, msg| {
             let mut st = host
                 .accounts
-                .entry(msg.destination)
+                .entry(msg.recipient)
                 .or_default()
                 .storage
                 .entry(key)
@@ -179,7 +179,7 @@ fn eip2929_sload_cold() {
         .gas_used(2103)
         .inspect_host(move |host, msg| {
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key].access_status,
+                host.accounts[&msg.recipient].storage[&key].access_status,
                 AccessStatus::Warm
             );
         })
@@ -212,11 +212,11 @@ fn eip2929_sload_two_slots() {
         .gas_used(4210)
         .inspect_host(move |host, msg| {
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key0].access_status,
+                host.accounts[&msg.recipient].storage[&key0].access_status,
                 AccessStatus::Warm
             );
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key1].access_status,
+                host.accounts[&msg.recipient].storage[&key1].access_status,
                 AccessStatus::Warm
             );
         })
@@ -232,7 +232,7 @@ fn eip2929_sload_warm() {
         .apply_host_fn(move |host, msg| {
             let st = host
                 .accounts
-                .entry(msg.destination)
+                .entry(msg.recipient)
                 .or_default()
                 .storage
                 .entry(key)
@@ -247,7 +247,7 @@ fn eip2929_sload_warm() {
         .gas_used(103)
         .inspect_host(move |host, msg| {
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key].access_status,
+                host.accounts[&msg.recipient].storage[&key].access_status,
                 AccessStatus::Warm
             );
         })
@@ -267,7 +267,7 @@ fn eip2929_sstore_modify_cold() {
         .code(Bytecode::new().sstore(1, 3))
         .apply_host_fn(move |host, msg| {
             host.accounts
-                .entry(msg.destination)
+                .entry(msg.recipient)
                 .or_default()
                 .storage
                 .entry(key)
@@ -281,11 +281,11 @@ fn eip2929_sstore_modify_cold() {
         .gas_used(5006)
         .inspect_host(move |host, msg| {
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key].value,
+                host.accounts[&msg.recipient].storage[&key].value,
                 H256(U256::from(3).into())
             );
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key].access_status,
+                host.accounts[&msg.recipient].storage[&key].access_status,
                 AccessStatus::Warm
             );
         })
@@ -297,11 +297,11 @@ fn eip2929_sstore_modify_cold() {
         .inspect_host(move |host, msg| {
             // The storage will be modified anyway, because the cost is checked after.
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key].value,
+                host.accounts[&msg.recipient].storage[&key].value,
                 H256(U256::from(3).into())
             );
             assert_eq!(
-                host.accounts[&msg.destination].storage[&key].access_status,
+                host.accounts[&msg.recipient].storage[&key].access_status,
                 AccessStatus::Warm
             );
         })
@@ -362,9 +362,9 @@ fn eip2929_delegatecall_cold() {
                 host.recorded.lock().account_accesses,
                 [
                     msg.sender,
-                    msg.destination,
+                    msg.recipient,
                     hex!("00000000000000000000000000000000000000de").into(),
-                    hex!("00000000000000000000000000000000000000de").into(),
+                    msg.sender,
                 ]
             );
         })
@@ -378,7 +378,7 @@ fn eip2929_delegatecall_cold() {
                 host.recorded.lock().account_accesses,
                 [
                     msg.sender,
-                    msg.destination,
+                    msg.recipient,
                     hex!("00000000000000000000000000000000000000de").into(),
                 ]
             );

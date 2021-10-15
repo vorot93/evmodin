@@ -180,8 +180,8 @@ pub struct Message {
     /// The amount of gas for message execution.
     pub gas: i64,
 
-    /// The destination of the message.
-    pub destination: Address,
+    /// The destination (recipient) of the message.
+    pub recipient: Address,
 
     /// The sender of the message.
     pub sender: Address,
@@ -191,6 +191,12 @@ pub struct Message {
 
     /// The amount of Ether transferred with the message.
     pub value: U256,
+
+    /// The address of the code to be executed.
+    ///
+    /// May be different from the evmc_message::destination (recipient)
+    /// in case of `CallKind::CallCode` or `CallKind::DelegateCall`.
+    pub code_address: Address,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -214,7 +220,8 @@ impl From<CreateMessage> for Message {
             is_static: false,
             depth: msg.depth,
             gas: msg.gas,
-            destination: Address::zero(),
+            recipient: Address::zero(),
+            code_address: Address::zero(),
             sender: msg.sender,
             input_data: msg.initcode,
             value: msg.endowment,

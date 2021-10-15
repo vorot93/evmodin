@@ -91,13 +91,13 @@ fn sload_cost_pre_tangerine_whistle() {
         .code(hex!("60008054"))
         .revision(Revision::Homestead)
         .apply_host_fn(|host, message| {
-            host.accounts.entry(message.destination).or_default();
+            host.accounts.entry(message.recipient).or_default();
         })
         .gas(56)
         .status(StatusCode::Success)
         .gas_left(0)
         .inspect_host(|host, message| {
-            assert_eq!(host.accounts[&message.destination].storage.len(), 0);
+            assert_eq!(host.accounts[&message.recipient].storage.len(), 0);
         })
         .check()
 }
@@ -334,7 +334,7 @@ fn tx_context() {
 fn balance() {
     EvmTester::new()
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 0x0504030201_u64.into()
+            host.accounts.entry(msg.recipient).or_default().balance = 0x0504030201_u64.into()
         })
         .code(
             Bytecode::new()
@@ -354,7 +354,7 @@ fn account_info_homestead() {
     let t = EvmTester::new()
         .revision(Revision::Homestead)
         .apply_host_fn(|host, msg| {
-            let acc = host.accounts.entry(msg.destination).or_default();
+            let acc = host.accounts.entry(msg.recipient).or_default();
             acc.balance = 1.into();
             acc.code = [1].to_vec().into();
         });
@@ -402,7 +402,7 @@ fn account_info_homestead() {
 fn selfbalance() {
     let t = EvmTester::new()
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 0x0504030201_u64.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 0x0504030201_u64.into();
         })
         // NOTE: adding push here to balance out the stack pre-Istanbul (needed to get undefined
         // instruction as a result)
@@ -584,7 +584,7 @@ fn selfdestruct_with_balance() {
         .code(code)
         .destination(hex!("000000000000000000000000000000000000005e"))
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.destination).or_default().balance = 0.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 0.into();
         });
 
     t.clone()
@@ -594,7 +594,7 @@ fn selfdestruct_with_balance() {
         .inspect_host(|host, msg| {
             let r = host.recorded.lock();
 
-            assert_eq!(r.account_accesses, [msg.destination]); // Selfdestruct.
+            assert_eq!(r.account_accesses, [msg.recipient]); // Selfdestruct.
         })
         .check();
 
@@ -609,7 +609,7 @@ fn selfdestruct_with_balance() {
                     // Exists?
                     beneficiary,
                     // Selfdestruct.
-                    msg.destination
+                    msg.recipient
                 ]
             );
         })
@@ -639,9 +639,9 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Balance.
-                    msg.destination,
+                    msg.recipient,
                     // Selfdestruct.
-                    msg.destination,
+                    msg.recipient,
                 ]
             )
         })
@@ -657,7 +657,7 @@ fn selfdestruct_with_balance() {
         .check();
 
     t = t.apply_host_fn(move |host, msg| {
-        host.accounts.entry(msg.destination).or_default().balance = 1.into();
+        host.accounts.entry(msg.recipient).or_default().balance = 1.into();
     });
 
     t.clone()
@@ -669,7 +669,7 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Selfdestruct.
-                    msg.destination
+                    msg.recipient
                 ]
             );
         })
@@ -686,7 +686,7 @@ fn selfdestruct_with_balance() {
                     // Exists?
                     beneficiary,
                     // Selfdestruct.
-                    msg.destination
+                    msg.recipient
                 ]
             );
         })
@@ -716,11 +716,11 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Balance
-                    msg.destination,
+                    msg.recipient,
                     // Exists?
                     beneficiary,
                     // Selfdestruct.
-                    msg.destination
+                    msg.recipient
                 ]
             );
         })
@@ -735,7 +735,7 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Balance
-                    msg.destination,
+                    msg.recipient,
                     // Exists?
                     beneficiary,
                 ]
@@ -745,7 +745,7 @@ fn selfdestruct_with_balance() {
 
     t = t.apply_host_fn(move |host, msg| {
         host.accounts.entry(beneficiary).or_default(); // Beneficiary exists.
-        host.accounts.get_mut(&msg.destination).unwrap().balance = 0.into();
+        host.accounts.get_mut(&msg.recipient).unwrap().balance = 0.into();
     });
 
     t.clone()
@@ -757,7 +757,7 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Selfdestruct.
-                    msg.destination,
+                    msg.recipient,
                 ]
             );
         })
@@ -774,7 +774,7 @@ fn selfdestruct_with_balance() {
                     // Exists?
                     beneficiary,
                     // Selfdestruct.
-                    msg.destination,
+                    msg.recipient,
                 ]
             );
         })
@@ -798,9 +798,9 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Balance.
-                    msg.destination,
+                    msg.recipient,
                     // Selfdestruct.
-                    msg.destination,
+                    msg.recipient,
                 ]
             );
         })
@@ -816,7 +816,7 @@ fn selfdestruct_with_balance() {
         .check();
 
     t = t.apply_host_fn(|host, msg| {
-        host.accounts.entry(msg.destination).or_default().balance = 1.into();
+        host.accounts.entry(msg.recipient).or_default().balance = 1.into();
     });
 
     t.clone()
@@ -828,7 +828,7 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Selfdestruct
-                    msg.destination
+                    msg.recipient
                 ]
             );
         })
@@ -845,7 +845,7 @@ fn selfdestruct_with_balance() {
                     // Exists?
                     beneficiary,
                     // Selfdestruct
-                    msg.destination
+                    msg.recipient
                 ]
             );
         })
@@ -869,11 +869,11 @@ fn selfdestruct_with_balance() {
                 host.recorded.lock().account_accesses,
                 [
                     // Balance
-                    msg.destination,
+                    msg.recipient,
                     // Exists?
                     beneficiary,
                     // Selfdestruct
-                    msg.destination
+                    msg.recipient
                 ]
             );
         })
@@ -1167,7 +1167,7 @@ fn extcodecopy_buffer_overflow() {
     let t = EvmTester::new().apply_host_fn({
         let code = code.clone();
         move |host, msg| {
-            host.accounts.entry(msg.destination).or_default().code = code.clone().into();
+            host.accounts.entry(msg.recipient).or_default().code = code.clone().into();
         }
     });
 

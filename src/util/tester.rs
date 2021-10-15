@@ -18,7 +18,7 @@ fn exec(
     // Add EIP-2929 tweak.
     if revision >= Revision::Berlin {
         host.access_account(message.sender);
-        host.access_account(message.destination);
+        host.access_account(message.recipient);
     }
     let code = AnalyzedCode::analyze(code);
 
@@ -79,7 +79,8 @@ impl EvmTester {
                 is_static: false,
                 depth: 0,
                 gas: i64::MAX,
-                destination: Address::zero(),
+                recipient: Address::zero(),
+                code_address: Address::zero(),
                 sender: Address::zero(),
                 input_data: Bytes::new(),
                 value: 0.into(),
@@ -130,7 +131,7 @@ impl EvmTester {
 
     /// Set message destination.
     pub fn destination(mut self, destination: impl Into<Address>) -> Self {
-        self.message.destination = destination.into();
+        self.message.recipient = destination.into();
         self
     }
 

@@ -2,7 +2,7 @@ use crate::{common::address_to_u256, host::*, state::ExecutionState};
 use ethereum_types::U256;
 
 pub(crate) fn address(state: &mut ExecutionState) {
-    state.stack.push(address_to_u256(state.message.destination));
+    state.stack.push(address_to_u256(state.message.recipient));
 }
 
 pub(crate) fn caller(state: &mut ExecutionState) {
@@ -154,7 +154,7 @@ macro_rules! selfbalance {
 
         let balance = ResumeDataVariant::into_balance(
             $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
-                address: $state.message.destination,
+                address: $state.message.recipient,
             }))
             .await,
         )
@@ -239,7 +239,7 @@ macro_rules! do_log {
         };
         let r = $co
             .yield_(InterruptDataVariant::EmitLog(EmitLog {
-                address: $state.message.destination,
+                address: $state.message.recipient,
                 data: data.to_vec().into(),
                 topics,
             }))
@@ -265,7 +265,7 @@ macro_rules! sload {
         if $state.evm_revision >= Revision::Berlin {
             let access_status = ResumeDataVariant::into_access_storage_status(
                 $co.yield_(InterruptDataVariant::AccessStorage(AccessStorage {
-                    address: $state.message.destination,
+                    address: $state.message.recipient,
                     key,
                 }))
                 .await,
@@ -285,7 +285,7 @@ macro_rules! sload {
 
         let storage = ResumeDataVariant::into_storage_value(
             $co.yield_(InterruptDataVariant::GetStorage(GetStorage {
-                address: $state.message.destination,
+                address: $state.message.recipient,
                 key,
             }))
             .await,
@@ -323,7 +323,7 @@ macro_rules! sstore {
         if $state.evm_revision >= Revision::Berlin {
             let access_status = ResumeDataVariant::into_access_storage_status(
                 $co.yield_(InterruptDataVariant::AccessStorage(AccessStorage {
-                    address: $state.message.destination,
+                    address: $state.message.recipient,
                     key,
                 }))
                 .await,
@@ -338,7 +338,7 @@ macro_rules! sstore {
 
         let status = ResumeDataVariant::into_storage_status_info(
             $co.yield_(InterruptDataVariant::SetStorage(SetStorage {
-                address: $state.message.destination,
+                address: $state.message.recipient,
                 key,
                 value,
             }))
@@ -414,7 +414,7 @@ macro_rules! selfdestruct {
                 || !{
                     ResumeDataVariant::into_balance(
                         $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
-                            address: $state.message.destination,
+                            address: $state.message.recipient,
                         }))
                         .await,
                     )
@@ -443,7 +443,7 @@ macro_rules! selfdestruct {
 
         assert!(matches!(
             $co.yield_(InterruptDataVariant::Selfdestruct(Selfdestruct {
-                address: $state.message.destination,
+                address: $state.message.recipient,
                 beneficiary,
             }))
             .await,

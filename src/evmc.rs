@@ -74,11 +74,12 @@ impl From<Message> for ExecutionMessage {
             flags,
             msg.depth,
             msg.gas,
-            msg.destination.convert(),
+            msg.recipient.convert(),
             msg.sender.convert(),
             (!msg.input_data.is_empty()).then(|| &*msg.input_data),
             msg.value.convert(),
             create2_salt,
+            msg.code_address.convert(),
         )
     }
 }
@@ -100,13 +101,14 @@ impl Message {
             is_static: msg.flags() == evmc_vm::ffi::evmc_flags::EVMC_STATIC as u32,
             depth: msg.depth(),
             gas: msg.gas(),
-            destination: msg.destination().bytes.into(),
+            recipient: msg.recipient().bytes.into(),
             sender: msg.sender().bytes.into(),
             input_data: msg
                 .input()
                 .map(|v| v.clone().into())
                 .unwrap_or_else(Bytes::new),
             value: msg.value().bytes.into(),
+            code_address: msg.code_address().bytes.into(),
         }
     }
 }

@@ -52,11 +52,16 @@ macro_rules! do_call {
             kind: $kind,
             is_static: $is_static || $state.message.is_static,
             depth: $state.message.depth + 1,
-            destination: dst,
+            recipient: if matches!($kind, CallKind::Call) {
+                dst
+            } else {
+                $state.message.recipient
+            },
+            code_address: dst,
             sender: if matches!($kind, CallKind::DelegateCall) {
                 $state.message.sender
             } else {
-                $state.message.destination
+                $state.message.recipient
             },
             gas: i64::MAX,
             value: if matches!($kind, CallKind::DelegateCall) {
@@ -118,7 +123,7 @@ macro_rules! do_call {
             && !(has_value
                 && ResumeDataVariant::into_balance(
                     $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
-                        address: $state.message.destination,
+                        address: $state.message.recipient,
                     }))
                     .await,
                 )
@@ -199,7 +204,7 @@ macro_rules! do_create {
             && !(!endowment.is_zero()
                 && ResumeDataVariant::into_balance(
                     $co.yield_(InterruptDataVariant::GetBalance(GetBalance {
-                        address: $state.message.destination,
+                        address: $state.message.recipient,
                     }))
                     .await,
                 )
@@ -223,7 +228,7 @@ macro_rules! do_create {
                 } else {
                     Bytes::new()
                 },
-                sender: $state.message.destination,
+                sender: $state.message.recipient,
                 depth: $state.message.depth + 1,
                 endowment,
             };

@@ -244,7 +244,7 @@ impl crate::Host for MockedHost {
     fn call(&mut self, msg: &Message) -> Output {
         let mut r = self.recorded.lock();
 
-        r.record_account_access(msg.destination);
+        r.record_account_access(msg.recipient);
 
         if r.calls.len() < MAX_RECORDED_CALLS {
             r.calls.push(msg.clone());
