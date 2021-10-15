@@ -872,6 +872,73 @@ fn invalid() {
 }
 
 #[test]
+fn inner_stop() {
+    EvmTester::new()
+        .code(
+            Bytecode::new()
+                .pushv(0)
+                .opcode(OpCode::STOP)
+                .opcode(OpCode::POP),
+        )
+        .gas(3)
+        .status(StatusCode::Success)
+        .gas_used(3)
+        .check()
+}
+
+#[test]
+fn inner_return() {
+    EvmTester::new()
+        .code(Bytecode::new().ret(0, 0).pushv(0))
+        .gas(6)
+        .status(StatusCode::Success)
+        .gas_used(6)
+        .check()
+}
+
+#[test]
+fn inner_revert() {
+    EvmTester::new()
+        .code(Bytecode::new().revert(0, 0).pushv(0))
+        .gas(6)
+        .status(StatusCode::Revert)
+        .gas_used(6)
+        .check()
+}
+
+#[test]
+fn inner_invalid() {
+    EvmTester::new()
+        .revision(Revision::Frontier)
+        .code(
+            Bytecode::new()
+                .pushv(0)
+                .append(hex!("fe"))
+                .opcode(OpCode::POP),
+        )
+        .gas(5)
+        .status(StatusCode::InvalidInstruction)
+        .gas_left(0)
+        .check()
+}
+
+#[test]
+fn inner_selfdestruct() {
+    EvmTester::new()
+        .revision(Revision::Frontier)
+        .code(
+            Bytecode::new()
+                .pushv(0)
+                .opcode(OpCode::SELFDESTRUCT)
+                .pushv(0),
+        )
+        .gas(3)
+        .status(StatusCode::Success)
+        .gas_used(3)
+        .check()
+}
+
+#[test]
 fn keccak256() {
     EvmTester::new()
         .code(hex!("6108006103ff2060005260206000f3"))

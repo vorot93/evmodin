@@ -66,6 +66,13 @@ impl Bytecode {
         self
     }
 
+    pub fn revert(mut self, index: impl Into<U256>, size: impl Into<U256>) -> Self {
+        self = self.pushv(index);
+        self = self.pushv(size);
+        self = self.opcode(OpCode::REVERT);
+        self
+    }
+
     pub fn mstore(mut self, index: impl Into<U256>) -> Self {
         self = self.pushv(index);
         self = self.opcode(OpCode::MSTORE);
