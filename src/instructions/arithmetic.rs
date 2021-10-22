@@ -141,24 +141,18 @@ pub(crate) fn signextend(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
 
-    let v = if a > U256::from(32) {
-        b
-    } else {
-        let mut v = U256::zero();
-        let len: usize = a.as_usize();
-        let t: usize = 8 * (len + 1) - 1;
-        let t_bit_mask = U256::one() << t;
-        let t_value = (b & t_bit_mask) >> t;
-        for i in 0..256 {
-            let bit_mask = U256::one() << i;
-            let i_value = (b & bit_mask) >> i;
-            if i <= t {
-                v = v.overflowing_add(i_value << i).0;
-            } else {
-                v = v.overflowing_add(t_value << i).0;
-            }
+    let v = if a < U256::from(32) {
+        // `low_u32` works since op1 < 32
+        let bit_index = (8 * a.low_u32() + 7) as usize;
+        let bit = b.bit(bit_index);
+        let mask = (U256::one() << bit_index) - U256::one();
+        if bit {
+            b | !mask
+        } else {
+            b & mask
         }
-        v
+    } else {
+        b
     };
 
     stack.push(v);
