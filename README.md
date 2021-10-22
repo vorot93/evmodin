@@ -40,3 +40,11 @@ assert_eq!(
     }
 )
 ```
+
+## Host / interpreter separation
+`evmodin` is not a standalone execution implementation - it is only an EVM interpreter with gas metering that must be coupled with Host, as defined in EVMC, for state access and inducing sub-calls. `MockedHost` is shipped in `evmodin`, but is only useful in tests.
+
+[Akula](https://github.com/akula-bft/akula), a fully-fledged Ethereum implementation, features its own version of Host for execution. Akula+evmodin pairing is considered to be the reference execution implementation which passes all Ethereum consensus tests.
+
+## Resumability
+`evmodin` is an interpreter loop that runs until host interaction/data is necessary. Then it exits with an interrupt. Each interrupt contains a value to be supplied to the host, and `resume` method which may accept data from Host, depending on interrupt. `AnalyzedCode::execute` simply loops, using data from `Host` to resume interrupts. You can make your own reactor that will handle interrupts instead, please see `ExecutionStartInterrupt::run_to_completion_with_host` for reference implementation.
