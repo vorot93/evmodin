@@ -3,6 +3,7 @@ name = "evmodin"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
+description = "Fast EVM implementation with support for resumability."
 
 [dependencies]
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
