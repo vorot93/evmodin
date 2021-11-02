@@ -4,10 +4,12 @@ use std::{borrow::Cow, fmt::Display};
 pub struct OpCode(pub u8);
 
 impl OpCode {
+    #[inline(always)]
     pub const fn to_u8(self) -> u8 {
         self.0
     }
 
+    #[inline(always)]
     pub const fn to_usize(self) -> usize {
         self.to_u8() as usize
     }
