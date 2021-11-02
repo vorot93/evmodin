@@ -1,7 +1,7 @@
 use crate::{common::*, state::*};
+use core::{cmp::min, num::NonZeroUsize};
 use ethereum_types::U256;
 use sha3::{Digest, Keccak256};
-use std::{cmp::min, num::NonZeroUsize};
 
 pub(crate) const MAX_BUFFER_SIZE: u32 = u32::MAX;
 

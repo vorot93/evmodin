@@ -3,10 +3,10 @@ use crate::{
     util::{mocked_host::*, *},
     *,
 };
+use alloc::{sync::Arc, vec::Vec};
 use bytes::Bytes;
 use educe::Educe;
 use ethereum_types::{Address, U256};
-use std::sync::Arc;
 
 fn exec(
     host: &mut MockedHost,
@@ -69,7 +69,7 @@ impl EvmTester {
     pub fn new() -> Self {
         Self {
             host: MockedHost::default(),
-            apply_host_fns: vec![],
+            apply_host_fns: alloc::vec![],
             inspect_output_fn: Arc::new(|_| ()),
             inspect_host_fn: Arc::new(|_, _| ()),
             inspect_fn: Arc::new(|_, _, _| ()),
@@ -167,7 +167,7 @@ impl EvmTester {
 
     /// Check returned status.
     pub fn status(mut self, expected_status_code: StatusCode) -> Self {
-        self.expected_status_codes = Some(vec![expected_status_code]);
+        self.expected_status_codes = Some(alloc::vec![expected_status_code]);
         self
     }
 
@@ -217,7 +217,7 @@ impl EvmTester {
     /// Execute provided code, run checks and return bytecode returned by EVM.
     pub fn check_and_get_result(self) -> Output {
         if self.collect_traces {
-            println!("Executing code: {}", hex::encode(&self.code));
+            std::println!("Executing code: {}", hex::encode(&self.code));
         }
         let mut host = self.host;
         for f in self.apply_host_fns {

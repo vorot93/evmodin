@@ -1,11 +1,12 @@
 use crate::{common::*, host::*, tracing::*, AnalyzedCode};
 use ::evmc_vm;
 use ::evmc_vm::{ffi::*, EvmcVm, ExecutionContext, ExecutionMessage, MessageFlags, MessageKind};
+use alloc::string::String;
 use arrayvec::ArrayVec;
 use bytes::Bytes;
+use core::convert::TryInto;
 use ethereum_types::{Address, H256, U256};
 use evmc_vm::ExecutionResult;
-use std::convert::TryInto;
 
 pub(crate) trait Convert {
     type Into;

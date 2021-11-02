@@ -1410,11 +1410,6 @@ fn memory_access() {
 
             let gas = 8796294610952;
 
-            println!(
-                "offset = {:#02x} size = {:#02x} opcode {}",
-                p.index, p.size, t.opcode
-            );
-
             let tester = EvmTester::new()
                 .code(code)
                 .gas(gas)

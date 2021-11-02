@@ -1,4 +1,5 @@
 use crate::opcode::*;
+use alloc::vec::Vec;
 use core::iter::repeat;
 use ethereum_types::U256;
 use std::ops::{Add, Mul};

@@ -1,14 +1,15 @@
 use crate::common::{Message, Revision};
+use alloc::vec::Vec;
 use arrayvec::ArrayVec;
 use bytes::Bytes;
 use ethereum_types::U256;
 use getset::{Getters, MutGetters};
-use serde::Serialize;
 
 const SIZE: usize = 1024;
 
 /// EVM stack.
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Stack(pub ArrayVec<U256, SIZE>);
 
 impl Stack {

@@ -1,9 +1,11 @@
 use crate::{host::*, *};
+use alloc::vec::Vec;
 use bytes::Bytes;
+use core::cmp::min;
 use ethereum_types::{Address, H256, U256};
 use hex_literal::hex;
 use parking_lot::Mutex;
-use std::{cmp::min, collections::HashMap};
+use std::collections::HashMap;
 
 /// LOG record.
 #[derive(Clone, Debug, PartialEq)]

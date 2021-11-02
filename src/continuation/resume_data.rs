@@ -1,6 +1,6 @@
 use super::*;
+use alloc::sync::Arc;
 use educe::Educe;
-use std::sync::Arc;
 
 pub type StateModifier = Option<Arc<dyn Fn(&mut ExecutionState) + Send + Sync>>;
 

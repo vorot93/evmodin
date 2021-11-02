@@ -1,6 +1,5 @@
 use super::*;
 use crate::state::*;
-use serde::Serialize;
 
 /// Passed into execution context to collect metrics.
 pub trait Tracer {
@@ -28,97 +27,110 @@ impl Tracer for NoopTracer {
     fn notify_execution_end(&mut self, _: &Output) {}
 }
 
-#[derive(Serialize)]
-struct ExecutionStart {
-    pub depth: i32,
-    pub rev: Revision,
-    #[serde(rename = "static")]
-    pub is_static: bool,
-}
+#[cfg(feature = "util")]
+pub use stdout_tracer::StdoutTracer;
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct InstructionStart {
-    pub pc: usize,
-    pub op: u8,
-    pub op_name: &'static str,
-    pub gas: i64,
-    pub stack: Stack,
-    pub memory_size: usize,
-}
+#[cfg(feature = "util")]
+mod stdout_tracer {
+    use super::*;
+    use alloc::{
+        string::{String, ToString},
+        vec::Vec,
+    };
+    use serde::Serialize;
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ExecutionEnd {
-    pub error: Option<String>,
-    pub gas: i64,
-    pub gas_used: i64,
-    pub output: String,
-}
-
-struct TracerContext {
-    message: Message,
-    code: Bytes,
-}
-
-/// Tracer which prints to stdout.
-#[derive(Default)]
-pub struct StdoutTracer {
-    execution_stack: Vec<TracerContext>,
-}
-
-impl Tracer for StdoutTracer {
-    fn notify_execution_start(&mut self, revision: Revision, message: Message, code: Bytes) {
-        println!(
-            "{}",
-            serde_json::to_string(&ExecutionStart {
-                depth: message.depth,
-                rev: revision,
-                is_static: message.is_static,
-            })
-            .unwrap()
-        );
-        self.execution_stack.push(TracerContext { message, code });
+    #[derive(Serialize)]
+    struct ExecutionStart {
+        pub depth: i32,
+        pub rev: Revision,
+        #[serde(rename = "static")]
+        pub is_static: bool,
     }
 
-    fn notify_instruction_start(&mut self, pc: usize, _: OpCode, state: &ExecutionState) {
-        let context = self.execution_stack.last().unwrap();
-        let opcode = OpCode(context.code[pc]);
-        println!(
-            "{}",
-            serde_json::to_string(&InstructionStart {
-                pc,
-                op: opcode.0,
-                op_name: opcode.name(),
-                gas: state.gas_left,
-                stack: state.stack.clone(),
-                memory_size: state.memory.len()
-            })
-            .unwrap()
-        )
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct InstructionStart {
+        pub pc: usize,
+        pub op: u8,
+        pub op_name: &'static str,
+        pub gas: i64,
+        pub stack: Stack,
+        pub memory_size: usize,
     }
 
-    fn notify_execution_end(&mut self, output: &Output) {
-        let context = self.execution_stack.pop().unwrap();
-        let error = match &output.status_code {
-            StatusCode::Success => None,
-            other => Some(other.to_string()),
-        };
-        let (gas_left, gas_used) = if error.is_none() {
-            (output.gas_left, context.message.gas - output.gas_left)
-        } else {
-            (0, context.message.gas)
-        };
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct ExecutionEnd {
+        pub error: Option<String>,
+        pub gas: i64,
+        pub gas_used: i64,
+        pub output: String,
+    }
 
-        println!(
-            "{}",
-            serde_json::to_string(&ExecutionEnd {
-                error,
-                gas: gas_left,
-                gas_used,
-                output: hex::encode(&output.output_data),
-            })
-            .unwrap()
-        )
+    struct TracerContext {
+        message: Message,
+        code: Bytes,
+    }
+
+    /// Tracer which prints to stdout.
+    #[derive(Default)]
+    pub struct StdoutTracer {
+        execution_stack: Vec<TracerContext>,
+    }
+
+    impl Tracer for StdoutTracer {
+        fn notify_execution_start(&mut self, revision: Revision, message: Message, code: Bytes) {
+            std::println!(
+                "{}",
+                serde_json::to_string(&ExecutionStart {
+                    depth: message.depth,
+                    rev: revision,
+                    is_static: message.is_static,
+                })
+                .unwrap()
+            );
+            self.execution_stack.push(TracerContext { message, code });
+        }
+
+        fn notify_instruction_start(&mut self, pc: usize, _: OpCode, state: &ExecutionState) {
+            let context = self.execution_stack.last().unwrap();
+            let opcode = OpCode(context.code[pc]);
+            std::println!(
+                "{}",
+                serde_json::to_string(&InstructionStart {
+                    pc,
+                    op: opcode.0,
+                    op_name: opcode.name(),
+                    gas: state.gas_left,
+                    stack: state.stack.clone(),
+                    memory_size: state.memory.len()
+                })
+                .unwrap()
+            )
+        }
+
+        fn notify_execution_end(&mut self, output: &Output) {
+            let context = self.execution_stack.pop().unwrap();
+            let error = match &output.status_code {
+                StatusCode::Success => None,
+                other => Some(other.to_string()),
+            };
+            let (gas_left, gas_used) = if error.is_none() {
+                (output.gas_left, context.message.gas - output.gas_left)
+            } else {
+                (0, context.message.gas)
+            };
+
+            std::println!(
+                "{}",
+                serde_json::to_string(&ExecutionEnd {
+                    error,
+                    gas: gas_left,
+                    gas_used,
+                    output: hex::encode(&output.output_data),
+                })
+                .unwrap()
+            )
+        }
     }
 }

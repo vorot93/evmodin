@@ -5,12 +5,13 @@ use crate::{
     state::ExecutionState,
     *,
 };
+use alloc::boxed::Box;
 use arrayvec::ArrayVec;
+use core::{convert::Infallible, pin::Pin};
 use derive_more::From;
 use enum_as_inner::EnumAsInner;
 use ethereum_types::*;
 use genawaiter::{Coroutine, GeneratorState};
-use std::{convert::Infallible, pin::Pin};
 
 mod sealed {
     pub trait Sealed {}

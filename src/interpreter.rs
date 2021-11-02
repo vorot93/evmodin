@@ -7,9 +7,10 @@ use crate::{
     tracing::Tracer,
     *,
 };
+use alloc::sync::Arc;
+use alloc::{boxed::Box, vec::Vec};
 use ethereum_types::U256;
 use genawaiter::sync::*;
-use std::sync::Arc;
 
 fn check_requirements(
     instruction_table: &InstructionTable,
@@ -56,7 +57,7 @@ impl AnalyzedCode {
     /// Analyze code and prepare it for execution.
     pub fn analyze(code: impl Into<Vec<u8>>) -> Self {
         let code = code.into();
-        let mut jumpdest_map = vec![false; code.len()];
+        let mut jumpdest_map = alloc::vec![false; code.len()];
 
         let mut i = 0;
         while i < code.len() {
@@ -199,11 +200,11 @@ impl ExecutionStartInterrupt {
                     i.resume(CodeHash { hash })
                 }
                 InterruptVariant::CopyCode(i) => {
-                    let mut code = vec![0; i.data().max_size];
+                    let mut code = alloc::vec![0; i.data().max_size];
                     let copied = host.copy_code(i.data().address, i.data().offset, &mut code[..]);
                     if copied > code.len() {
                         return Output {
-                            status_code: StatusCode::InternalError(format!(
+                            status_code: StatusCode::InternalError(alloc::format!(
                                 "copy code: copied {} > max size {}",
                                 copied,
                                 code.len()

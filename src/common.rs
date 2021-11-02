@@ -1,10 +1,11 @@
+use alloc::string::String;
 use bytes::Bytes;
 use ethereum_types::{Address, H256, U256};
-use serde::Serialize;
 use strum_macros::Display;
 
 /// EVM revision.
-#[derive(Clone, Copy, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Copy, Debug, Display, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Revision {
     /// The Frontier revision.
     /// The one Ethereum launched with.

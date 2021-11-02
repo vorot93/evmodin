@@ -1,4 +1,10 @@
 #![doc = include_str!("../README.md")]
+#![no_std]
+extern crate alloc;
+
+#[cfg(feature = "std")]
+extern crate std;
+
 use bytes::Bytes;
 pub use common::{
     CallKind, CreateMessage, Message, Output, Revision, StatusCode, SuccessfulOutput,

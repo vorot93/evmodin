@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Display};
+use alloc::{borrow::Cow, fmt::Display};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpCode(pub u8);
@@ -327,11 +327,11 @@ impl OpCode {
 }
 
 impl Display for OpCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
         let name = self.name();
 
         let n = if name == "UNDEFINED" {
-            Cow::Owned(format!("UNDEFINED(0x{:02x})", self.0))
+            Cow::Owned(alloc::format!("UNDEFINED(0x{:02x})", self.0))
         } else {
             Cow::Borrowed(name)
         };

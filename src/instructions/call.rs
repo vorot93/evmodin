@@ -2,7 +2,7 @@
 #[macro_export]
 macro_rules! do_call {
     ($co:expr, $state:expr, $kind:expr, $is_static:expr) => {{
-        use std::cmp::min;
+        use core::cmp::min;
         use $crate::{
             common::u256_to_address,
             continuation::{interrupt_data::*, resume_data::*},
