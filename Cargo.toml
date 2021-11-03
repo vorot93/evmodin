@@ -8,17 +8,19 @@ description = "Fast EVM implementation with support for resumability."
 [dependencies]
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bytes = { version = "1", default-features = false, features = ["serde"] }
-derive_more = "0.99"
+derive_more = { version = "0.99", default-features = false, features = [
+    "from",
+] }
 educe = { version = "0.4", default-features = false, features = ["Debug"] }
-enum-as-inner = "0.3"
+enum-as-inner = { version = "0.3", default-features = false }
 evmc-declare = { git = "https://github.com/ethereum/evmc", tag = "v10.0.0-alpha.1", optional = true }
 evmc-vm = { git = "https://github.com/ethereum/evmc", tag = "v10.0.0-alpha.1", optional = true }
 i256 = { git = "https://github.com/vorot93/rust-i256" }
 ethereum-types = { version = "0.12", default-features = false }
 genawaiter = { git = "https://github.com/cuviper/genawaiter", branch = "unhacked" }
-getset = "0.1"
-hex = "0.4"
-hex-literal = { version = "0.3", optional = true }
+getset = { version = "0.1", default-features = false }
+hex = { version = "0.4", default-features = false }
+hex-literal = { version = "0.3", default-features = false, optional = true }
 num-traits = { version = "0.2", default-features = false }
 once_cell = { version = "1", default-features = false, features = ["alloc"] }
 parking_lot = { version = "0.11", optional = true }

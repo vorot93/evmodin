@@ -1,6 +1,7 @@
 use super::*;
 use alloc::sync::Arc;
 use educe::Educe;
+use enum_as_inner::EnumAsInner;
 
 pub type StateModifier = Option<Arc<dyn Fn(&mut ExecutionState) + Send + Sync>>;
 
