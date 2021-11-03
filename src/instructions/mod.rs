@@ -9,4 +9,4 @@ pub(crate) mod memory;
 pub(crate) mod properties;
 pub(crate) mod stack_manip;
 
-pub use properties::PROPERTIES;
+pub use properties::get_properties;

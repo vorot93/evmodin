@@ -2,7 +2,7 @@
 
 use core::iter::repeat;
 use ethereum_types::U256;
-use evmodin::{opcode::*, util::*, *};
+use evmodin::{instructions::get_properties, opcode::*, util::*, *};
 use hex_literal::hex;
 use std::cmp::max;
 
@@ -1370,7 +1370,7 @@ fn memory_access() {
     .map(MemoryAccessParams::from)
     .collect();
 
-    let metrics = &*evmodin::instructions::PROPERTIES;
+    let metrics = get_properties();
 
     for p in memory_access_test_cases {
         let push_size = format!("64{:0>10x}", p.size);
