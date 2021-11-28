@@ -1,5 +1,5 @@
 use crate::common::{Message, Output};
-use ethereum_types::{Address, H256, U256};
+use ethereum_types::*;
 
 /// State access status (EIP-2929).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -57,10 +57,10 @@ pub trait Host {
     fn account_exists(&self, address: Address) -> bool;
     /// Get value of a storage key.
     ///
-    /// Returns `Ok(H256::zero())` if does not exist.
-    fn get_storage(&self, address: Address, key: H256) -> H256;
+    /// Returns `Ok(U256::zero())` if does not exist.
+    fn get_storage(&self, address: Address, key: U256) -> U256;
     /// Set value of a storage key.
-    fn set_storage(&mut self, address: Address, key: H256, value: H256) -> StorageStatus;
+    fn set_storage(&mut self, address: Address, key: U256, value: U256) -> StorageStatus;
     /// Get balance of an account.
     ///
     /// Returns `Ok(0)` if account does not exist.
@@ -72,7 +72,7 @@ pub trait Host {
     /// Get code hash of an account.
     ///
     /// Returns `Ok(0)` if account does not exist.
-    fn get_code_hash(&self, address: Address) -> H256;
+    fn get_code_hash(&self, address: Address) -> U256;
     /// Copy code of an account.
     ///
     /// Returns `Ok(0)` if offset is invalid.
@@ -85,10 +85,10 @@ pub trait Host {
     fn get_tx_context(&self) -> TxContext;
     /// Get block hash.
     ///
-    /// Returns `Ok(H256::zero())` if block does not exist.
-    fn get_block_hash(&self, block_number: u64) -> H256;
+    /// Returns `Ok(U256::zero())` if block does not exist.
+    fn get_block_hash(&self, block_number: u64) -> U256;
     /// Emit a log.
-    fn emit_log(&mut self, address: Address, data: &[u8], topics: &[H256]);
+    fn emit_log(&mut self, address: Address, data: &[u8], topics: &[U256]);
     /// Mark account as warm, return previous access status.
     ///
     /// Returns `Ok(AccessStatus::Cold)` if account does not exist.
@@ -96,7 +96,7 @@ pub trait Host {
     /// Mark storage key as warm, return previous access status.
     ///
     /// Returns `Ok(AccessStatus::Cold)` if account does not exist.
-    fn access_storage(&mut self, address: Address, key: H256) -> AccessStatus;
+    fn access_storage(&mut self, address: Address, key: U256) -> AccessStatus;
 }
 
 /// Host that does not support any ops.
@@ -107,11 +107,11 @@ impl Host for DummyHost {
         todo!()
     }
 
-    fn get_storage(&self, _: Address, _: H256) -> H256 {
+    fn get_storage(&self, _: Address, _: U256) -> U256 {
         todo!()
     }
 
-    fn set_storage(&mut self, _: Address, _: H256, _: H256) -> StorageStatus {
+    fn set_storage(&mut self, _: Address, _: U256, _: U256) -> StorageStatus {
         todo!()
     }
 
@@ -123,7 +123,7 @@ impl Host for DummyHost {
         todo!()
     }
 
-    fn get_code_hash(&self, _: Address) -> H256 {
+    fn get_code_hash(&self, _: Address) -> U256 {
         todo!()
     }
 
@@ -143,11 +143,11 @@ impl Host for DummyHost {
         todo!()
     }
 
-    fn get_block_hash(&self, _: u64) -> H256 {
+    fn get_block_hash(&self, _: u64) -> U256 {
         todo!()
     }
 
-    fn emit_log(&mut self, _: Address, _: &[u8], _: &[H256]) {
+    fn emit_log(&mut self, _: Address, _: &[u8], _: &[U256]) {
         todo!()
     }
 
@@ -155,7 +155,7 @@ impl Host for DummyHost {
         todo!()
     }
 
-    fn access_storage(&mut self, _: Address, _: H256) -> AccessStatus {
+    fn access_storage(&mut self, _: Address, _: U256) -> AccessStatus {
         todo!()
     }
 }

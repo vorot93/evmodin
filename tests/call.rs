@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use core::iter::repeat_with;
-use ethereum_types::{Address, H256, U256};
+use ethereum_types::*;
 use evmodin::{opcode::*, util::*, *};
 use hex_literal::hex;
 
@@ -98,9 +98,11 @@ fn create() {
         .gas_used(115816)
         .status(StatusCode::Success)
         .inspect_host(move |host, _| {
-            let mut key = H256::zero();
-            key.0[31] = 1;
-            assert_eq!(host.accounts[&address].storage[&key].value.0[22], 0xcc);
+            let key = 1.into();
+            assert_eq!(
+                H256(host.accounts[&address].storage[&key].value.into()).0[22],
+                0xcc
+            );
 
             let r = host.recorded.lock();
             assert_eq!(r.calls.len(), 1);
@@ -163,18 +165,11 @@ fn create2() {
             assert_eq!(r.calls.len(), 1);
 
             let call_msg = r.calls.last().unwrap();
-            assert_eq!(
-                call_msg.kind,
-                CallKind::Create2 {
-                    salt: H256(U256::from(0x5a).into())
-                }
-            );
+            assert_eq!(call_msg.kind, CallKind::Create2 { salt: 0x5a.into() });
             assert_eq!(call_msg.gas, 263775);
 
             assert_eq!(
-                host.accounts[&address].storage[&H256(U256::from(1).into())]
-                    .value
-                    .0[22],
+                H256(host.accounts[&address].storage[&1.into()].value.into()).0[22],
                 0xc2
             );
 
@@ -199,7 +194,7 @@ fn create2_salt_cost() {
             assert_eq!(r.calls.len(), 1);
             assert_eq!(
                 r.calls.last().unwrap().kind,
-                CallKind::Create2 { salt: H256::zero() }
+                CallKind::Create2 { salt: U256::zero() }
             );
             assert_eq!(r.calls.last().unwrap().depth, 1);
         })
@@ -276,7 +271,7 @@ fn create_failure() {
                     if op == OpCode::CREATE {
                         CallKind::Create
                     } else {
-                        CallKind::Create2 { salt: H256::zero() }
+                        CallKind::Create2 { salt: U256::zero() }
                     }
                 );
             })
@@ -297,7 +292,7 @@ fn create_failure() {
                     if op == OpCode::CREATE {
                         CallKind::Create
                     } else {
-                        CallKind::Create2 { salt: H256::zero() }
+                        CallKind::Create2 { salt: U256::zero() }
                     }
                 );
             })
@@ -318,7 +313,7 @@ fn create_failure() {
                     if op == OpCode::CREATE {
                         CallKind::Create
                     } else {
-                        CallKind::Create2 { salt: H256::zero() }
+                        CallKind::Create2 { salt: U256::zero() }
                     }
                 );
             })

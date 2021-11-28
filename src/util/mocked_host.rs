@@ -1,6 +1,6 @@
 use crate::{host::*, *};
 use bytes::Bytes;
-use ethereum_types::{Address, H256, U256};
+use ethereum_types::*;
 use hex_literal::hex;
 use parking_lot::Mutex;
 use std::{cmp::min, collections::HashMap};
@@ -15,7 +15,7 @@ pub struct LogRecord {
     pub data: Bytes,
 
     /// The log topics.
-    pub topics: Vec<H256>,
+    pub topics: Vec<U256>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -29,7 +29,7 @@ pub struct SelfdestructRecord {
 
 #[derive(Clone, Debug, Default)]
 pub struct StorageValue {
-    pub value: H256,
+    pub value: U256,
     pub dirty: bool,
     pub access_status: AccessStatus,
 }
@@ -41,11 +41,11 @@ pub struct Account {
     /// The account code.
     pub code: Bytes,
     /// The code hash. Can be a value not related to the actual code.
-    pub code_hash: H256,
+    pub code_hash: U256,
     /// The account balance.
     pub balance: U256,
     /// The account storage map.
-    pub storage: HashMap<H256, StorageValue>,
+    pub storage: HashMap<U256, StorageValue>,
 }
 
 const MAX_RECORDED_ACCOUNT_ACCESSES: usize = 200;
@@ -67,7 +67,7 @@ pub struct Records {
 pub struct MockedHost {
     pub accounts: HashMap<Address, Account>,
     pub tx_context: TxContext,
-    pub block_hash: H256,
+    pub block_hash: U256,
     pub call_result: Output,
     pub recorded: Mutex<Records>,
 }
@@ -99,7 +99,7 @@ impl Default for MockedHost {
                 chain_id: U256::zero(),
                 block_base_fee: U256::zero(),
             },
-            block_hash: H256::zero(),
+            block_hash: U256::zero(),
             call_result: Output {
                 status_code: StatusCode::Success,
                 gas_left: 0,
@@ -125,20 +125,20 @@ impl crate::Host for MockedHost {
         self.accounts.contains_key(&address)
     }
 
-    fn get_storage(&self, address: ethereum_types::Address, key: H256) -> H256 {
+    fn get_storage(&self, address: ethereum_types::Address, key: U256) -> U256 {
         self.recorded.lock().record_account_access(address);
 
         self.accounts
             .get(&address)
             .and_then(|account| account.storage.get(&key).map(|value| value.value))
-            .unwrap_or_else(H256::zero)
+            .unwrap_or_else(U256::zero)
     }
 
     fn set_storage(
         &mut self,
         address: ethereum_types::Address,
-        key: H256,
-        value: H256,
+        key: U256,
+        value: U256,
     ) -> StorageStatus {
         self.recorded.lock().record_account_access(address);
 
@@ -197,13 +197,13 @@ impl crate::Host for MockedHost {
             .unwrap_or_else(U256::zero)
     }
 
-    fn get_code_hash(&self, address: ethereum_types::Address) -> H256 {
+    fn get_code_hash(&self, address: ethereum_types::Address) -> U256 {
         self.recorded.lock().record_account_access(address);
 
         self.accounts
             .get(&address)
             .map(|acc| acc.code_hash)
-            .unwrap_or_else(H256::zero)
+            .unwrap_or_else(U256::zero)
     }
 
     fn copy_code(&self, address: Address, code_offset: usize, buffer: &mut [u8]) -> usize {
@@ -260,12 +260,12 @@ impl crate::Host for MockedHost {
         self.tx_context.clone()
     }
 
-    fn get_block_hash(&self, block_number: u64) -> H256 {
+    fn get_block_hash(&self, block_number: u64) -> U256 {
         self.recorded.lock().blockhashes.push(block_number);
         self.block_hash
     }
 
-    fn emit_log(&mut self, address: ethereum_types::Address, data: &[u8], topics: &[H256]) {
+    fn emit_log(&mut self, address: ethereum_types::Address, data: &[u8], topics: &[U256]) {
         self.recorded.lock().logs.push(LogRecord {
             creator: address,
             data: data.to_vec().into(),
@@ -294,7 +294,7 @@ impl crate::Host for MockedHost {
         }
     }
 
-    fn access_storage(&mut self, address: ethereum_types::Address, key: H256) -> AccessStatus {
+    fn access_storage(&mut self, address: ethereum_types::Address, key: U256) -> AccessStatus {
         let value = self
             .accounts
             .entry(address)

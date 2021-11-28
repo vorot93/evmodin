@@ -1,4 +1,3 @@
-use ethereum_types::{H256, U256};
 use evmodin::{host::*, opcode::*, util::*, *};
 use hex_literal::hex;
 
@@ -156,7 +155,7 @@ fn eip2929_extcodecopy_oog() {
 
 #[test]
 fn eip2929_sload_cold() {
-    let key = H256(U256::one().into());
+    let key = 1.into();
 
     let t = EvmTester::new()
         .revision(Revision::Berlin)
@@ -169,7 +168,7 @@ fn eip2929_sload_cold() {
                 .storage
                 .entry(key)
                 .or_default();
-            st.value = H256(U256::from(2).into());
+            st.value = 2.into();
             assert_eq!(st.access_status, AccessStatus::Cold);
         });
 
@@ -193,17 +192,17 @@ fn eip2929_sload_cold() {
 
 #[test]
 fn eip2929_sload_two_slots() {
-    let key0 = H256(U256::from(0).into());
-    let key1 = H256(U256::from(1).into());
+    let key0 = 0.into();
+    let key1 = 1.into();
 
     EvmTester::new()
         .revision(Revision::Berlin)
         .code(
             Bytecode::new()
-                .pushv(key0.0)
+                .pushv(key0)
                 .opcode(OpCode::SLOAD)
                 .opcode(OpCode::POP)
-                .pushv(key1.0)
+                .pushv(key1)
                 .opcode(OpCode::SLOAD)
                 .opcode(OpCode::POP),
         )
@@ -225,7 +224,7 @@ fn eip2929_sload_two_slots() {
 
 #[test]
 fn eip2929_sload_warm() {
-    let key = H256(U256::from(1).into());
+    let key = 1.into();
     let t = EvmTester::new()
         .revision(Revision::Berlin)
         .code(Bytecode::new().pushv(1).opcode(OpCode::SLOAD))
@@ -237,7 +236,7 @@ fn eip2929_sload_warm() {
                 .storage
                 .entry(key)
                 .or_default();
-            st.value = H256(U256::from(2).into());
+            st.value = 2.into();
             st.access_status = AccessStatus::Warm;
         });
 
@@ -261,7 +260,7 @@ fn eip2929_sload_warm() {
 
 #[test]
 fn eip2929_sstore_modify_cold() {
-    let key = H256(U256::from(1).into());
+    let key = 1.into();
     let t = EvmTester::new()
         .revision(Revision::Berlin)
         .code(Bytecode::new().sstore(1, 3))
@@ -272,7 +271,7 @@ fn eip2929_sstore_modify_cold() {
                 .storage
                 .entry(key)
                 .or_default()
-                .value = H256(U256::from(2).into());
+                .value = 2.into();
         });
 
     t.clone()
@@ -280,10 +279,7 @@ fn eip2929_sstore_modify_cold() {
         .status(StatusCode::Success)
         .gas_used(5006)
         .inspect_host(move |host, msg| {
-            assert_eq!(
-                host.accounts[&msg.recipient].storage[&key].value,
-                H256(U256::from(3).into())
-            );
+            assert_eq!(host.accounts[&msg.recipient].storage[&key].value, 3.into());
             assert_eq!(
                 host.accounts[&msg.recipient].storage[&key].access_status,
                 AccessStatus::Warm
@@ -296,10 +292,7 @@ fn eip2929_sstore_modify_cold() {
         .gas_used(5005)
         .inspect_host(move |host, msg| {
             // The storage will be modified anyway, because the cost is checked after.
-            assert_eq!(
-                host.accounts[&msg.recipient].storage[&key].value,
-                H256(U256::from(3).into())
-            );
+            assert_eq!(host.accounts[&msg.recipient].storage[&key].value, 3.into());
             assert_eq!(
                 host.accounts[&msg.recipient].storage[&key].access_status,
                 AccessStatus::Warm

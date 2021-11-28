@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use ethereum_types::{Address, H256, U256};
+use ethereum_types::*;
 use serde::Serialize;
 use strum_macros::Display;
 
@@ -161,7 +161,7 @@ pub enum CallKind {
     DelegateCall,
     CallCode,
     Create,
-    Create2 { salt: H256 },
+    Create2 { salt: U256 },
 }
 
 /// The message describing an EVM call,
@@ -201,7 +201,7 @@ pub struct Message {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CreateMessage {
-    pub salt: Option<H256>,
+    pub salt: Option<U256>,
     pub gas: i64,
     pub depth: i32,
     pub initcode: Bytes,

@@ -3,7 +3,7 @@ use ::evmc_vm;
 use ::evmc_vm::{ffi::*, EvmcVm, ExecutionContext, ExecutionMessage, MessageFlags, MessageKind};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
-use ethereum_types::{Address, H256, U256};
+use ethereum_types::*;
 use evmc_vm::ExecutionResult;
 use std::convert::TryInto;
 
@@ -176,13 +176,13 @@ impl<'a> Host for ExecutionContext<'a> {
         ExecutionContext::account_exists(self, &address.convert())
     }
 
-    fn get_storage(&self, address: Address, key: H256) -> H256 {
+    fn get_storage(&self, address: Address, key: U256) -> U256 {
         ExecutionContext::get_storage(self, &address.convert(), &key.convert())
             .bytes
             .into()
     }
 
-    fn set_storage(&mut self, address: Address, key: H256, value: H256) -> StorageStatus {
+    fn set_storage(&mut self, address: Address, key: U256, value: U256) -> StorageStatus {
         match ExecutionContext::set_storage(
             self,
             &address.convert(),
@@ -207,7 +207,7 @@ impl<'a> Host for ExecutionContext<'a> {
         ExecutionContext::get_code_size(self, &address.convert()).into()
     }
 
-    fn get_code_hash(&self, address: Address) -> H256 {
+    fn get_code_hash(&self, address: Address) -> U256 {
         ExecutionContext::get_code_hash(self, &address.convert())
             .bytes
             .into()
@@ -251,13 +251,13 @@ impl<'a> Host for ExecutionContext<'a> {
         }
     }
 
-    fn get_block_hash(&self, block_number: u64) -> H256 {
+    fn get_block_hash(&self, block_number: u64) -> U256 {
         ExecutionContext::get_block_hash(self, block_number.try_into().unwrap())
             .bytes
             .into()
     }
 
-    fn emit_log(&mut self, address: Address, data: &[u8], topics: &[H256]) {
+    fn emit_log(&mut self, address: Address, data: &[u8], topics: &[U256]) {
         ExecutionContext::emit_log(
             self,
             &address.convert(),
@@ -273,7 +273,7 @@ impl<'a> Host for ExecutionContext<'a> {
         ExecutionContext::access_account(self, &address.convert()).into()
     }
 
-    fn access_storage(&mut self, address: Address, key: H256) -> AccessStatus {
+    fn access_storage(&mut self, address: Address, key: U256) -> AccessStatus {
         ExecutionContext::access_storage(self, &address.convert(), &key.convert()).into()
     }
 }

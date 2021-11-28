@@ -1,4 +1,4 @@
-use ethereum_types::{Address, H256};
+use ethereum_types::*;
 use evmodin::{
     opcode::*,
     util::{mocked_host::*, *},
@@ -130,11 +130,9 @@ fn sstore_cost() {
         Revision::Petersburg,
         Revision::Istanbul,
     ] {
-        let v1 = H256(hex!(
-            "0000000000000000000000000000000000000000000000000000000000000001"
-        ));
+        let v1 = 1.into();
 
-        fn get_storage<K: Into<H256>>(host: &mut MockedHost, key: K) -> &mut StorageValue {
+        fn get_storage<K: Into<U256>>(host: &mut MockedHost, key: K) -> &mut StorageValue {
             host.accounts
                 .entry(Address::zero())
                 .or_default()
@@ -458,7 +456,7 @@ fn log() {
                 assert_eq!(&*last_log.data, &hex!("7700") as &[u8]);
                 assert_eq!(last_log.topics.len(), n);
                 for i in 0..n {
-                    assert_eq!(last_log.topics[i].0[31] as usize, 4 - i);
+                    assert_eq!(last_log.topics[i], (4 - i).into());
                 }
             })
             .check()
@@ -895,7 +893,9 @@ fn blockhash() {
         .status(StatusCode::Success)
         .gas_used(38)
         .apply_host_fn(|host, _| {
-            host.block_hash.0[13] = 0x13;
+            let mut v = H256(host.block_hash.into());
+            v.0[13] = 0x13;
+            host.block_hash = <[u8; 32]>::from(v).into();
         });
 
     t.clone()
@@ -1019,7 +1019,10 @@ fn extcodehash() {
         .status(StatusCode::Success)
         .gas_used(418)
         .inspect(|host, _, output| {
-            assert_eq!(output, host.accounts[&Address::zero()].code_hash.0);
+            assert_eq!(
+                output,
+                <[u8; 32]>::from(host.accounts[&Address::zero()].code_hash)
+            );
         })
         .check()
 }

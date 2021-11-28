@@ -345,7 +345,7 @@ macro_rules! extcodehash {
             }
         }
 
-        $state.stack.push(U256::from_big_endian(
+        $state.stack.push(
             ResumeDataVariant::into_code_hash(
                 $co.yield_(InterruptDataVariant::GetCodeHash(GetCodeHash {
                     address: addr,
@@ -353,8 +353,7 @@ macro_rules! extcodehash {
                 .await,
             )
             .unwrap()
-            .hash
-            .as_bytes(),
-        ));
+            .hash,
+        );
     };
 }

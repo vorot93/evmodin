@@ -163,7 +163,7 @@ macro_rules! do_call {
 #[macro_export]
 macro_rules! do_create {
     ($co:expr, $state:expr, $create2:expr) => {{
-        use ethereum_types::H256;
+        use ethereum_types::U256;
         use $crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -192,7 +192,7 @@ macro_rules! do_create {
                 }
             }
 
-            Some(H256(salt.into()))
+            Some(salt)
         } else {
             None
         };

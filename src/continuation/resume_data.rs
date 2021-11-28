@@ -21,7 +21,7 @@ pub struct CodeSize {
 
 #[derive(Debug)]
 pub struct StorageValue {
-    pub value: H256,
+    pub value: U256,
 }
 
 #[derive(Debug)]
@@ -31,12 +31,12 @@ pub struct StorageStatusInfo {
 
 #[derive(Debug)]
 pub struct CodeHash {
-    pub hash: H256,
+    pub hash: U256,
 }
 
 #[derive(Debug)]
 pub struct BlockHash {
-    pub hash: H256,
+    pub hash: U256,
 }
 
 #[derive(Debug)]

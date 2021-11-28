@@ -169,7 +169,6 @@ macro_rules! selfbalance {
 #[macro_export]
 macro_rules! blockhash {
     ($co:expr, $state:expr) => {
-        use ethereum_types::H256;
         use $crate::continuation::{interrupt_data::*, resume_data::*};
 
         let number = $state.stack.pop();
@@ -182,7 +181,7 @@ macro_rules! blockhash {
         .block_number;
         let lower_bound = upper_bound.saturating_sub(256);
 
-        let mut header = H256::zero();
+        let mut header = U256::zero();
         if number <= u64::MAX.into() {
             let n = number.as_u64();
             if (lower_bound..upper_bound).contains(&n) {
@@ -197,7 +196,7 @@ macro_rules! blockhash {
             }
         }
 
-        $state.stack.push(U256::from_big_endian(&header.0));
+        $state.stack.push(header);
     };
 }
 
@@ -206,7 +205,6 @@ macro_rules! blockhash {
 macro_rules! do_log {
     ($co:expr, $state:expr, $num_topics:expr) => {{
         use arrayvec::ArrayVec;
-        use ethereum_types::H256;
         use $crate::continuation::{interrupt_data::*, resume_data::*};
 
         if $state.message.is_static {
@@ -229,7 +227,7 @@ macro_rules! do_log {
 
         let mut topics = ArrayVec::new();
         for _ in 0..$num_topics {
-            topics.push(H256($state.stack.pop().into()));
+            topics.push($state.stack.pop());
         }
 
         let data = if let Some(region) = region {
@@ -253,14 +251,13 @@ macro_rules! do_log {
 #[macro_export]
 macro_rules! sload {
     ($co:expr, $state:expr) => {{
-        use ethereum_types::H256;
         use $crate::{
             continuation::{interrupt_data::*, resume_data::*},
             host::*,
             instructions::properties::{COLD_SLOAD_COST, WARM_STORAGE_READ_COST},
         };
 
-        let key = H256($state.stack.pop().into());
+        let key = $state.stack.pop();
 
         if $state.evm_revision >= Revision::Berlin {
             let access_status = ResumeDataVariant::into_access_storage_status(
@@ -293,7 +290,7 @@ macro_rules! sload {
         .unwrap()
         .value;
 
-        $state.stack.push(U256::from_big_endian(storage.as_bytes()));
+        $state.stack.push(storage);
     }};
 }
 
@@ -301,7 +298,6 @@ macro_rules! sload {
 #[macro_export]
 macro_rules! sstore {
     ($co:expr, $state:expr) => {{
-        use ethereum_types::H256;
         use $crate::{
             continuation::{interrupt_data::*, resume_data::*},
             host::*,
@@ -316,8 +312,8 @@ macro_rules! sstore {
             return Err(StatusCode::OutOfGas);
         }
 
-        let key = H256($state.stack.pop().into());
-        let value = H256($state.stack.pop().into());
+        let key = $state.stack.pop();
+        let value = $state.stack.pop();
 
         let mut cost = 0;
         if $state.evm_revision >= Revision::Berlin {
