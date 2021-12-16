@@ -1,6 +1,6 @@
 use crate::{state::*, Revision, StatusCode};
-use core::convert::TryInto;
-use ethereum_types::{U256, U512};
+use ethereum_types::U512;
+use ethnum::U256;
 use i256::I256;
 
 pub(crate) fn add(stack: &mut Stack) {
@@ -24,7 +24,7 @@ pub(crate) fn sub(stack: &mut Stack) {
 pub(crate) fn div(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
-    stack.push(if b.is_zero() { U256::zero() } else { a / b });
+    stack.push(if b == 0 { U256::ZERO } else { a / b });
 }
 
 pub(crate) fn sdiv(stack: &mut Stack) {
@@ -37,7 +37,7 @@ pub(crate) fn sdiv(stack: &mut Stack) {
 pub(crate) fn modulo(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
-    let v = if b.is_zero() { U256::zero() } else { a % b };
+    let v = if b == 0 { U256::ZERO } else { a % b };
     stack.push(v);
 }
 
@@ -45,8 +45,8 @@ pub(crate) fn smod(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
 
-    let v = if b.is_zero() {
-        U256::zero()
+    let v = if b == 0 {
+        U256::ZERO
     } else {
         let v = I256::from(a) % I256::from(b);
         v.into()
@@ -56,42 +56,54 @@ pub(crate) fn smod(stack: &mut Stack) {
 }
 
 pub(crate) fn addmod(stack: &mut Stack) {
-    let a = U512::from(stack.pop());
-    let b = U512::from(stack.pop());
-    let c = U512::from(stack.pop());
+    let a = stack.pop();
+    let b = stack.pop();
+    let c = stack.pop();
 
-    let v = if c.is_zero() {
-        U256::zero()
+    let v = if c == 0 {
+        U256::ZERO
     } else {
-        let v = (a + b) % c;
-        v.try_into().unwrap()
+        let v = ethereum_types::U256::try_from(
+            (U512::from_big_endian(&a.to_be_bytes()) + U512::from_big_endian(&b.to_be_bytes()))
+                % U512::from_big_endian(&c.to_be_bytes()),
+        )
+        .unwrap();
+        let mut arr = [0; 32];
+        v.to_big_endian(&mut arr);
+        U256::from_be_bytes(arr)
     };
 
     stack.push(v);
 }
 
 pub(crate) fn mulmod(stack: &mut Stack) {
-    let a = U512::from(stack.pop());
-    let b = U512::from(stack.pop());
-    let c = U512::from(stack.pop());
+    let a = stack.pop();
+    let b = stack.pop();
+    let c = stack.pop();
 
-    let v = if c.is_zero() {
-        U256::zero()
+    let v = if c == 0 {
+        U256::ZERO
     } else {
-        let v = (a * b) % c;
-        v.try_into().unwrap()
+        let v = ethereum_types::U256::try_from(
+            (U512::from_big_endian(&a.to_be_bytes()) * U512::from_big_endian(&b.to_be_bytes()))
+                % U512::from_big_endian(&c.to_be_bytes()),
+        )
+        .unwrap();
+        let mut arr = [0; 32];
+        v.to_big_endian(&mut arr);
+        U256::from_be_bytes(arr)
     };
 
     stack.push(v);
 }
 
 fn log2floor(value: U256) -> u64 {
-    assert!(value != U256::zero());
+    assert!(value != 0);
     let mut l: u64 = 256;
-    for i in 0..4 {
-        let i = 3 - i;
-        if value.0[i] == 0u64 {
-            l -= 64;
+    for i in 0..=1 {
+        let i = 1 - i;
+        if value.0[i] == 0 {
+            l -= 128;
         } else {
             l -= value.0[i].leading_zeros() as u64;
             if l == 0 {
@@ -108,7 +120,7 @@ pub(crate) fn exp(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let mut base = state.stack.pop();
     let mut power = state.stack.pop();
 
-    if !power.is_zero() {
+    if power > 0 {
         let additional_gas = if state.evm_revision >= Revision::Spurious {
             50
         } else {
@@ -122,10 +134,10 @@ pub(crate) fn exp(state: &mut ExecutionState) -> Result<(), StatusCode> {
         }
     }
 
-    let mut v = U256::one();
+    let mut v = U256::ONE;
 
-    while !power.is_zero() {
-        if !(power & U256::one()).is_zero() {
+    while power > 0 {
+        if (power & 1) != 0 {
             v = v.overflowing_mul(base).0;
         }
         power >>= 1;
@@ -141,11 +153,11 @@ pub(crate) fn signextend(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
 
-    let v = if a < U256::from(32) {
-        // `low_u32` works since op1 < 32
-        let bit_index = (8 * a.low_u32() + 7) as usize;
-        let bit = b.bit(bit_index);
-        let mask = (U256::one() << bit_index) - U256::one();
+    let v = if a < 32 {
+        let bit_index = (8 * a.as_u32() + 7) as usize;
+        let (hi, lo) = b.into_words();
+        let bit = if bit_index > 0x7f { hi } else { lo } & (1 << (bit_index % 128)) != 0;
+        let mask = (U256::ONE << bit_index) - U256::ONE;
         if bit {
             b | !mask
         } else {

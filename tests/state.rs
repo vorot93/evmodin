@@ -1,4 +1,5 @@
 use ethereum_types::*;
+use ethnum::{AsU256, U256};
 use evmodin::{
     opcode::*,
     util::{mocked_host::*, *},
@@ -22,18 +23,18 @@ fn codecopy_combinations() {
     // The CODECOPY arguments are provided in calldata: first byte is index, second byte is size.
     // The whole copied code is returned.
     let code = Bytecode::new()
-        .pushv(0)
+        .pushv(0_u128)
         .opcode(OpCode::CALLDATALOAD)
-        .pushv(1)
+        .pushv(1_u128)
         .opcode(OpCode::BYTE)
         .opcode(OpCode::DUP1)
-        .pushv(0)
+        .pushv(0_u128)
         .opcode(OpCode::CALLDATALOAD)
-        .pushv(0)
+        .pushv(0_u128)
         .opcode(OpCode::BYTE)
-        .pushv(0)
+        .pushv(0_u128)
         .opcode(OpCode::CODECOPY)
-        .pushv(0)
+        .pushv(0_u128)
         .opcode(OpCode::RETURN)
         .build();
 
@@ -115,7 +116,12 @@ fn sstore_out_of_block_gas() {
         (20008, StatusCode::OutOfGas),
     ] {
         EvmTester::new()
-            .code(Bytecode::new().pushv(0).sstore(0, 1).opcode(OpCode::POP))
+            .code(
+                Bytecode::new()
+                    .pushv(0_u128)
+                    .sstore(0, 1)
+                    .opcode(OpCode::POP),
+            )
             .gas(gas)
             .status(status)
             .check()
@@ -130,14 +136,14 @@ fn sstore_cost() {
         Revision::Petersburg,
         Revision::Istanbul,
     ] {
-        let v1 = 1.into();
+        let v1 = 1_u8.into();
 
-        fn get_storage<K: Into<U256>>(host: &mut MockedHost, key: K) -> &mut StorageValue {
+        fn get_storage<K: AsU256>(host: &mut MockedHost, key: K) -> &mut StorageValue {
             host.accounts
                 .entry(Address::zero())
                 .or_default()
                 .storage
-                .entry(key.into())
+                .entry(key.as_u256())
                 .or_default()
         }
 
@@ -303,14 +309,17 @@ fn tx_context() {
             host.tx_context.block_timestamp = 0xdd;
             host.tx_context.block_number = 0x1100;
             host.tx_context.block_gas_limit = 0x990000;
-            host.tx_context.chain_id =
-                hex!("00000000000000000000000000000000000000000000000000000000aa000000").into();
+            host.tx_context.chain_id = U256::from_be_bytes(hex!(
+                "00000000000000000000000000000000000000000000000000000000aa000000"
+            ));
             host.tx_context.block_coinbase.0[1] = 0xcc;
             host.tx_context.tx_origin.0[2] = 0x55;
-            host.tx_context.block_difficulty =
-                hex!("00dd000000000000000000000000000000000000000000000000000000000000").into();
-            host.tx_context.tx_gas_price =
-                hex!("0000660000000000000000000000000000000000000000000000000000000000").into();
+            host.tx_context.block_difficulty = U256::from_be_bytes(hex!(
+                "00dd000000000000000000000000000000000000000000000000000000000000"
+            ));
+            host.tx_context.tx_gas_price = U256::from_be_bytes(hex!(
+                "0000660000000000000000000000000000000000000000000000000000000000"
+            ));
         })
         .status(StatusCode::Success)
         .gas_used(52)
@@ -353,7 +362,7 @@ fn account_info_homestead() {
         .revision(Revision::Homestead)
         .apply_host_fn(|host, msg| {
             let acc = host.accounts.entry(msg.recipient).or_default();
-            acc.balance = 1.into();
+            acc.balance = U256::ONE;
             acc.code = [1].to_vec().into();
         });
 
@@ -456,7 +465,7 @@ fn log() {
                 assert_eq!(&*last_log.data, &hex!("7700") as &[u8]);
                 assert_eq!(last_log.topics.len(), n);
                 for i in 0..n {
-                    assert_eq!(last_log.topics[i], (4 - i).into());
+                    assert_eq!(last_log.topics[i], 4 - i as u128);
                 }
             })
             .check()
@@ -468,7 +477,7 @@ fn log0_empty() {
     EvmTester::new()
         .code(
             Bytecode::new()
-                .pushv(0)
+                .pushv(0_u128)
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::LOG0),
         )
@@ -582,7 +591,7 @@ fn selfdestruct_with_balance() {
         .code(code)
         .destination(hex!("000000000000000000000000000000000000005e"))
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.recipient).or_default().balance = 0.into();
+            host.accounts.entry(msg.recipient).or_default().balance = U256::ZERO;
         });
 
     t.clone()
@@ -655,7 +664,7 @@ fn selfdestruct_with_balance() {
         .check();
 
     t = t.apply_host_fn(move |host, msg| {
-        host.accounts.entry(msg.recipient).or_default().balance = 1.into();
+        host.accounts.entry(msg.recipient).or_default().balance = U256::ONE;
     });
 
     t.clone()
@@ -743,7 +752,7 @@ fn selfdestruct_with_balance() {
 
     t = t.apply_host_fn(move |host, msg| {
         host.accounts.entry(beneficiary).or_default(); // Beneficiary exists.
-        host.accounts.get_mut(&msg.recipient).unwrap().balance = 0.into();
+        host.accounts.get_mut(&msg.recipient).unwrap().balance = U256::ZERO;
     });
 
     t.clone()
@@ -814,7 +823,7 @@ fn selfdestruct_with_balance() {
         .check();
 
     t = t.apply_host_fn(|host, msg| {
-        host.accounts.entry(msg.recipient).or_default().balance = 1.into();
+        host.accounts.entry(msg.recipient).or_default().balance = U256::ONE;
     });
 
     t.clone()
@@ -893,9 +902,9 @@ fn blockhash() {
         .status(StatusCode::Success)
         .gas_used(38)
         .apply_host_fn(|host, _| {
-            let mut v = H256(host.block_hash.into());
-            v.0[13] = 0x13;
-            host.block_hash = <[u8; 32]>::from(v).into();
+            let mut v = host.block_hash.to_be_bytes();
+            v[13] = 0x13;
+            host.block_hash = U256::from_be_bytes(v);
         });
 
     t.clone()
@@ -1005,8 +1014,9 @@ fn extcodecopy_big_index() {
 fn extcodehash() {
     let t = EvmTester::new()
         .apply_host_fn(|host, _| {
-            host.accounts.entry(Address::zero()).or_default().code_hash =
-                hex!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee").into();
+            host.accounts.entry(Address::zero()).or_default().code_hash = U256::from_be_bytes(
+                hex!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+            );
         })
         .code(hex!("60003f60005260206000f3"));
 
@@ -1021,7 +1031,7 @@ fn extcodehash() {
         .inspect(|host, _, output| {
             assert_eq!(
                 output,
-                <[u8; 32]>::from(host.accounts[&Address::zero()].code_hash)
+                host.accounts[&Address::zero()].code_hash.to_be_bytes()
             );
         })
         .check()
@@ -1049,7 +1059,7 @@ fn extcodecopy_empty() {
     EvmTester::new()
         .code(
             Bytecode::new()
-                .pushv(0)
+                .pushv(0_u128)
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::DUP1)
@@ -1058,7 +1068,7 @@ fn extcodecopy_empty() {
                 .ret_top(),
         )
         .status(StatusCode::Success)
-        .output_value(0)
+        .output_value(U256::ZERO)
         .check()
 }
 
@@ -1067,9 +1077,9 @@ fn codecopy_memory_cost() {
     EvmTester::new()
         .code(
             Bytecode::new()
-                .pushv(1)
-                .pushv(0)
-                .pushv(0)
+                .pushv(1_u128)
+                .pushv(0_u128)
+                .pushv(0_u128)
                 .opcode(OpCode::CODECOPY),
         )
         .status(StatusCode::Success)
@@ -1082,8 +1092,8 @@ fn extcodecopy_memory_cost() {
     EvmTester::new()
         .code(
             Bytecode::new()
-                .pushv(1)
-                .pushv(0)
+                .pushv(1_u128)
+                .pushv(0_u128)
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::EXTCODECOPY),
@@ -1098,7 +1108,7 @@ fn extcodecopy_nonzero_index() {
     let code = Bytecode::new()
         .pushv(2)
         .pushv(index)
-        .pushv(0)
+        .pushv(0_u128)
         .pushv(0xa)
         .opcode(OpCode::EXTCODECOPY)
         .ret(0, 2)
@@ -1137,8 +1147,8 @@ fn extcodecopy_fill_tail() {
         .code(
             Bytecode::new()
                 .pushv(2)
-                .pushv(0)
-                .pushv(0)
+                .pushv(0_u128)
+                .pushv(0_u128)
                 .pushv(0xa)
                 .opcode(OpCode::EXTCODECOPY)
                 .ret(0, 2),

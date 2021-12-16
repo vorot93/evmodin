@@ -5,7 +5,8 @@ use crate::{
 };
 use bytes::Bytes;
 use educe::Educe;
-use ethereum_types::{Address, U256};
+use ethereum_types::Address;
+use ethnum::{AsU256, U256};
 use std::sync::Arc;
 
 fn exec(
@@ -83,7 +84,7 @@ impl EvmTester {
                 code_address: Address::zero(),
                 sender: Address::zero(),
                 input_data: Bytes::new(),
-                value: 0.into(),
+                value: U256::ZERO,
             },
             code: Vec::new(),
             gas_check: None,
@@ -142,8 +143,8 @@ impl EvmTester {
     }
 
     /// Set message sender.
-    pub fn value(mut self, value: impl Into<U256>) -> Self {
-        self.message.value = value.into();
+    pub fn value(mut self, value: impl AsU256) -> Self {
+        self.message.value = value.as_u256();
         self
     }
 
@@ -178,10 +179,8 @@ impl EvmTester {
     }
 
     /// Check output to be equal to provided integer.
-    pub fn output_value(mut self, expected_output_data: impl Into<U256>) -> Self {
-        let mut data = [0; 32];
-        expected_output_data.into().to_big_endian(&mut data);
-        self.expected_output_data = Some(data.to_vec());
+    pub fn output_value(mut self, expected_output_data: impl AsU256) -> Self {
+        self.expected_output_data = Some(expected_output_data.as_u256().to_be_bytes().to_vec());
         self
     }
 

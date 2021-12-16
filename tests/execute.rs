@@ -1,7 +1,7 @@
 #![allow(clippy::needless_range_loop)]
 
 use core::iter::repeat;
-use ethereum_types::U256;
+use ethnum::U256;
 use evmodin::{opcode::*, util::*, *};
 use hex_literal::hex;
 use std::cmp::max;
@@ -329,7 +329,7 @@ fn bad_jumpdest() {
 #[test]
 fn jump_to_block_beginning() {
     EvmTester::new()
-        .code(Bytecode::new().jumpi(U256::zero(), OpCode::MSIZE).jump(4))
+        .code(Bytecode::new().jumpi(U256::ZERO, OpCode::MSIZE).jump(4))
         .status(StatusCode::BadJumpDestination)
         .check()
 }
@@ -341,7 +341,7 @@ fn jumpi_stack() {
             .code(
                 Bytecode::new()
                     .pushv(0xde)
-                    .jumpi(U256::from(6), OpCode::CALLDATASIZE)
+                    .jumpi(U256::from(6_u8), OpCode::CALLDATASIZE)
                     .opcode(OpCode::JUMPDEST)
                     .ret_top(),
             )
@@ -649,11 +649,11 @@ fn signextend_31() {
     for (code, output) in [
         (
             hex!("61010160000360081c601e0b60005260206000f3"),
-            &hex!("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe") as &[u8],
+            hex!("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
         ),
         (
             hex!("61010160000360081c601f0b60005260206000f3"),
-            &hex!("00fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe") as &[u8],
+            hex!("00fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
         ),
     ] {
         EvmTester::new()
@@ -661,7 +661,7 @@ fn signextend_31() {
             .revision(Revision::Constantinople)
             .status(StatusCode::Success)
             .gas_used(38)
-            .output_value(output)
+            .output_value(U256::from_be_bytes(output))
             .check();
     }
 }
@@ -785,7 +785,7 @@ fn calldataload_outofrange() {
                 .ret_top(),
         )
         .status(StatusCode::Success)
-        .output_value(U256::zero())
+        .output_value(0)
         .check()
 }
 
@@ -841,9 +841,9 @@ fn caller_callvalue() {
                 .append(hex!("600a600af3")), // RETURN(10,10)
         )
         .sender(hex!("dd00000000000000000000000000000000000000"))
-        .value(hex!(
+        .value(U256::from_be_bytes(hex!(
             "00000000000000000000000000ee000000000000000000000000000000000000"
-        ))
+        )))
         .status(StatusCode::Success)
         .gas(22)
         .gas_left(0)
@@ -1007,8 +1007,9 @@ fn return_empty_buffer_at_high_offset() {
                     .opcode(opcode),
             )
             .apply_host_fn(|host, _| {
-                host.tx_context.block_difficulty =
-                    hex!("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1").into()
+                host.tx_context.block_difficulty = U256::from_be_bytes(hex!(
+                    "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1"
+                ))
             })
             .status(status)
             .check();

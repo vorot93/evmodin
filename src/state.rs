@@ -1,7 +1,7 @@
 use crate::common::{Message, Revision};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
-use ethereum_types::U256;
+use ethnum::U256;
 use getset::{Getters, MutGetters};
 use serde::Serialize;
 
@@ -92,17 +92,17 @@ mod tests {
     fn stack() {
         let mut stack = Stack::default();
 
-        let items = [0xde, 0xad, 0xbe, 0xef];
+        let items: [u128; 4] = [0xde, 0xad, 0xbe, 0xef];
 
         for (i, item) in items.iter().copied().enumerate() {
             stack.push(item.into());
             assert_eq!(stack.len(), i + 1);
         }
 
-        assert_eq!(*stack.get(2), 0xad.into());
+        assert_eq!(*stack.get(2), 0xad);
 
-        assert_eq!(stack.pop(), 0xef.into());
+        assert_eq!(stack.pop(), 0xef);
 
-        assert_eq!(*stack.get(2), 0xde.into());
+        assert_eq!(*stack.get(2), 0xde);
     }
 }

@@ -1,5 +1,6 @@
 use crate::common::{Message, Output};
-use ethereum_types::*;
+use ethereum_types::Address;
+use ethnum::U256;
 
 /// State access status (EIP-2929).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

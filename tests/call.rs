@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use core::iter::repeat_with;
 use ethereum_types::*;
+use ethnum::U256;
 use evmodin::{opcode::*, util::*, *};
 use hex_literal::hex;
 
@@ -20,7 +21,7 @@ fn delegatecall() {
             host.call_result.output_data = (&hex!("0a0b0c") as &[u8]).into();
             host.call_result.gas_left = 1;
         })
-        .value(value.0)
+        .value(U256::from_be_bytes(value.0))
         .gas(1700)
         .gas_used(1690)
         .status(StatusCode::Success)
@@ -34,7 +35,7 @@ fn delegatecall() {
             let call_msg = r.calls.last().unwrap();
             assert_eq!(call_msg.gas, gas_left - gas_left / 64);
             assert_eq!(call_msg.input_data.len(), 3);
-            assert_eq!(<[u8; 32]>::from(call_msg.value)[17], 0xfe);
+            assert_eq!(call_msg.value.to_be_bytes()[17], 0xfe);
         })
         .check()
 }
@@ -72,7 +73,7 @@ fn delegatecall_oog_depth_limit() {
     t.clone()
         .status(StatusCode::Success)
         .gas_used(73)
-        .output_value(0)
+        .output_value(0_u128)
         .check();
 
     t.gas(73).status(StatusCode::OutOfGas).check();
@@ -84,7 +85,7 @@ fn create() {
 
     EvmTester::new()
         .apply_host_fn(move |host, _| {
-            host.accounts.entry(address).or_default().balance = 1.into();
+            host.accounts.entry(address).or_default().balance = U256::ONE;
 
             host.call_result.output_data = (&hex!("0a0b0c") as &[u8]).into();
             host.call_result
@@ -98,9 +99,9 @@ fn create() {
         .gas_used(115816)
         .status(StatusCode::Success)
         .inspect_host(move |host, _| {
-            let key = 1.into();
+            let key = U256::ONE;
             assert_eq!(
-                H256(host.accounts[&address].storage[&key].value.into()).0[22],
+                H256(host.accounts[&address].storage[&key].value.to_be_bytes()).0[22],
                 0xcc
             );
 
@@ -146,7 +147,7 @@ fn create2() {
     EvmTester::new()
         .revision(Revision::Constantinople)
         .apply_host_fn(move |host, _| {
-            host.accounts.entry(address).or_default().balance = 1.into();
+            host.accounts.entry(address).or_default().balance = U256::ONE;
 
             host.call_result.output_data = (&hex!("0a0b0c") as &[u8]).into();
             host.call_result
@@ -165,11 +166,21 @@ fn create2() {
             assert_eq!(r.calls.len(), 1);
 
             let call_msg = r.calls.last().unwrap();
-            assert_eq!(call_msg.kind, CallKind::Create2 { salt: 0x5a.into() });
+            assert_eq!(
+                call_msg.kind,
+                CallKind::Create2 {
+                    salt: 0x5a_u128.into()
+                }
+            );
             assert_eq!(call_msg.gas, 263775);
 
             assert_eq!(
-                H256(host.accounts[&address].storage[&1.into()].value.into()).0[22],
+                H256(
+                    host.accounts[&address].storage[&1_u128.into()]
+                        .value
+                        .to_be_bytes()
+                )
+                .0[22],
                 0xc2
             );
 
@@ -194,7 +205,7 @@ fn create2_salt_cost() {
             assert_eq!(r.calls.len(), 1);
             assert_eq!(
                 r.calls.last().unwrap().kind,
-                CallKind::Create2 { salt: U256::zero() }
+                CallKind::Create2 { salt: U256::ZERO }
             );
             assert_eq!(r.calls.last().unwrap().depth, 1);
         })
@@ -216,11 +227,11 @@ fn create_balance_too_low() {
         EvmTester::new()
             .revision(Revision::Constantinople)
             .apply_host_fn(|host, _| {
-                host.accounts.entry(Address::zero()).or_default().balance = 1.into();
+                host.accounts.entry(Address::zero()).or_default().balance = 1_u128.into();
             })
             .code(
                 Bytecode::new()
-                    .pushv(2)
+                    .pushv(2_u128)
                     .opcode(OpCode::DUP1)
                     .opcode(OpCode::DUP1)
                     .opcode(OpCode::DUP1)
@@ -228,7 +239,7 @@ fn create_balance_too_low() {
                     .ret_top(),
             )
             .status(StatusCode::Success)
-            .output_value(0)
+            .output_value(0_u128)
             .inspect_host(|host, _| {
                 assert_eq!(host.recorded.lock().calls, []);
             })
@@ -248,7 +259,7 @@ fn create_failure() {
             .revision(Revision::Constantinople)
             .code(
                 Bytecode::new()
-                    .pushv(0)
+                    .pushv(0_u128)
                     .opcode(OpCode::DUP1)
                     .opcode(OpCode::DUP1)
                     .opcode(OpCode::DUP1)
@@ -271,7 +282,7 @@ fn create_failure() {
                     if op == OpCode::CREATE {
                         CallKind::Create
                     } else {
-                        CallKind::Create2 { salt: U256::zero() }
+                        CallKind::Create2 { salt: U256::ZERO }
                     }
                 );
             })
@@ -282,7 +293,7 @@ fn create_failure() {
                 host.call_result.status_code = StatusCode::Revert;
             })
             .status(StatusCode::Success)
-            .output_value(0)
+            .output_value(0_u128)
             .inspect_host(move |host, _| {
                 let r = host.recorded.lock();
 
@@ -292,7 +303,7 @@ fn create_failure() {
                     if op == OpCode::CREATE {
                         CallKind::Create
                     } else {
-                        CallKind::Create2 { salt: U256::zero() }
+                        CallKind::Create2 { salt: U256::ZERO }
                     }
                 );
             })
@@ -303,7 +314,7 @@ fn create_failure() {
                 host.call_result.status_code = StatusCode::Failure;
             })
             .status(StatusCode::Success)
-            .output_value(0)
+            .output_value(0_u128)
             .inspect_host(move |host, _| {
                 let r = host.recorded.lock();
 
@@ -313,7 +324,7 @@ fn create_failure() {
                     if op == OpCode::CREATE {
                         CallKind::Create
                     } else {
-                        CallKind::Create2 { salt: U256::zero() }
+                        CallKind::Create2 { salt: U256::ZERO }
                     }
                 );
             })
@@ -332,13 +343,13 @@ fn call_failing_with_value() {
             })
             .code(
                 Bytecode::new()
-                    .pushv(0xff)
-                    .pushv(0)
+                    .pushv(0xff_u128)
+                    .pushv(0_u128)
                     .opcode(OpCode::DUP2)
                     .opcode(OpCode::DUP2)
-                    .pushv(1)
-                    .pushv(0xaa)
-                    .pushv(0x8000)
+                    .pushv(1_u128)
+                    .pushv(0xaa_u128)
+                    .pushv(0x8000_u128)
                     .opcode(op)
                     .opcode(OpCode::POP),
             );
@@ -385,7 +396,7 @@ fn call_with_value() {
         .code(hex!("60ff600060ff6000600160aa618000f150"))
         .destination(call_sender)
         .apply_host_fn(move |host, msg| {
-            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = 1_u128.into();
             host.accounts.entry(call_dst).or_default();
             host.call_result.gas_left = 1.into();
         })
@@ -439,7 +450,7 @@ fn call_depth_limit() {
             .depth(1024)
             .code(
                 Bytecode::new()
-                    .pushv(0)
+                    .pushv(0_u128)
                     .opcode(OpCode::DUP1)
                     .opcode(OpCode::DUP1)
                     .opcode(OpCode::DUP1)
@@ -454,7 +465,7 @@ fn call_depth_limit() {
             .inspect_host(|host, _| {
                 assert_eq!(host.recorded.lock().calls, []);
             })
-            .output_value(0)
+            .output_value(U256::ZERO)
             .check()
     }
 }
@@ -473,7 +484,7 @@ fn call_output() {
             .apply_host_fn({
                 let call_output = call_output.clone();
                 move |host, _| {
-                    host.accounts.entry(Address::zero()).or_default().balance = 1.into();
+                    host.accounts.entry(Address::zero()).or_default().balance = U256::ONE;
                     host.call_result.output_data = call_output.clone();
                 }
             })
@@ -486,7 +497,7 @@ fn call_output() {
             });
 
         let code_prefix_output_1 = Bytecode::new()
-            .pushv(1)
+            .pushv(1_u8)
             .opcode(OpCode::DUP1)
             .opcode(OpCode::DUP1)
             .opcode(OpCode::DUP1)
@@ -495,7 +506,7 @@ fn call_output() {
             .opcode(OpCode::DUP1)
             .pushb(hex!("7fffffffffffffff"));
         let code_prefix_output_0 = Bytecode::new()
-            .pushv(0)
+            .pushv(0_u128)
             .opcode(OpCode::DUP1)
             .opcode(OpCode::DUP1)
             .opcode(OpCode::DUP1)
@@ -503,7 +514,7 @@ fn call_output() {
             .opcode(OpCode::DUP1)
             .opcode(OpCode::DUP1)
             .pushb(hex!("7fffffffffffffff"));
-        let code_suffix = Bytecode::new().ret(0, 3);
+        let code_suffix = Bytecode::new().ret(0_u128, 3_u128);
 
         t.clone()
             .code(
@@ -543,13 +554,13 @@ fn call_high_gas() {
             .gas(5000)
             .code(
                 Bytecode::new()
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0xaa)
-                    .pushv(0x134c)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0xaa_u128)
+                    .pushv(0x134c_u128)
                     .opcode(call_opcode),
             )
             .status(StatusCode::OutOfGas)
@@ -569,13 +580,13 @@ fn call_value_zero_to_nonexistent_account() {
         })
         .code(
             Bytecode::new()
-                .pushv(0x40)
-                .pushv(0)
-                .pushv(0x40)
-                .pushv(0)
-                .pushv(0)
-                .pushv(0xaa)
-                .pushv(call_gas)
+                .pushv(0x40_u8)
+                .pushv(0_u8)
+                .pushv(0x40_u8)
+                .pushv(0_u8)
+                .pushv(0_u8)
+                .pushv(0xaa_u8)
+                .pushv(call_gas as u128)
                 .opcode(OpCode::CALL)
                 .opcode(OpCode::POP),
         )
@@ -594,7 +605,7 @@ fn call_value_zero_to_nonexistent_account() {
                 call_msg.recipient,
                 hex!("00000000000000000000000000000000000000aa").into()
             );
-            assert_eq!(call_msg.value, 0.into());
+            assert_eq!(call_msg.value, 0);
         })
         .check()
 }
@@ -607,14 +618,14 @@ fn call_new_account_creation_cost() {
     let t = EvmTester::new()
         .code(
             Bytecode::new()
-                .pushv(0)
-                .pushv(0)
-                .pushv(0)
-                .pushv(0)
-                .pushv(0)
+                .pushv(0_u128)
+                .pushv(0_u128)
+                .pushv(0_u128)
+                .pushv(0_u128)
+                .pushv(0_u128)
                 .opcode(OpCode::CALLDATALOAD)
                 .pushb(call_dst.0)
-                .pushv(0)
+                .pushv(0_u128)
                 .opcode(OpCode::CALL)
                 .ret_top(),
         )
@@ -623,12 +634,12 @@ fn call_new_account_creation_cost() {
     t.clone()
         .revision(Revision::Tangerine)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.recipient).or_default().balance = 0.into();
+            host.accounts.entry(msg.recipient).or_default().balance = U256::ZERO;
         })
         .input(&hex!("00") as &[u8])
         .status(StatusCode::Success)
         .gas_used(25000 + 739)
-        .output_value(1)
+        .output_value(U256::ONE)
         .inspect_host(move |host, _| {
             assert_eq!(
                 host.recorded.lock().account_accesses,
@@ -643,12 +654,12 @@ fn call_new_account_creation_cost() {
     t.clone()
         .revision(Revision::Tangerine)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = U256::ONE;
         })
         .input(&hex!("0000000000000000000000000000000000000000000000000000000000000001") as &[u8])
         .status(StatusCode::Success)
         .gas_used(25000 + 9000 + 739)
-        .output_value(1)
+        .output_value(U256::ONE)
         .inspect_host(move |host, msg| {
             let r = host.recorded.lock();
             assert_eq!(r.calls.len(), 1);
@@ -656,7 +667,7 @@ fn call_new_account_creation_cost() {
             assert_eq!(call_msg.recipient, call_dst);
             assert_eq!(call_msg.gas, 2300);
             assert_eq!(call_msg.sender, destination);
-            assert_eq!(call_msg.value, 1.into());
+            assert_eq!(call_msg.value, 1);
             assert_eq!(call_msg.input_data, Bytes::new());
             assert_eq!(
                 r.account_accesses,
@@ -672,12 +683,12 @@ fn call_new_account_creation_cost() {
     t.clone()
         .revision(Revision::Spurious)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.recipient).or_default().balance = 0.into();
+            host.accounts.entry(msg.recipient).or_default().balance = U256::ZERO;
         })
         .input(&hex!("00") as &[u8])
         .status(StatusCode::Success)
         .gas_used(739)
-        .output_value(1)
+        .output_value(U256::ONE)
         .inspect_host(move |host, _| {
             let r = host.recorded.lock();
             assert_eq!(r.calls.len(), 1);
@@ -685,7 +696,7 @@ fn call_new_account_creation_cost() {
             assert_eq!(call_msg.recipient, call_dst);
             assert_eq!(call_msg.gas, 0);
             assert_eq!(call_msg.sender, destination);
-            assert_eq!(call_msg.value, 0.into());
+            assert_eq!(call_msg.value, 0);
             assert_eq!(call_msg.input_data, Bytes::new());
             assert_eq!(
                 r.account_accesses,
@@ -698,12 +709,12 @@ fn call_new_account_creation_cost() {
 
     t.revision(Revision::Spurious)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = U256::ONE;
         })
         .input(&hex!("0000000000000000000000000000000000000000000000000000000000000001") as &[u8])
         .status(StatusCode::Success)
         .gas_used(25000 + 9000 + 739)
-        .output_value(1)
+        .output_value(U256::ONE)
         .inspect_host(move |host, msg| {
             let r = host.recorded.lock();
             assert_eq!(r.calls.len(), 1);
@@ -711,7 +722,7 @@ fn call_new_account_creation_cost() {
             assert_eq!(call_msg.recipient, call_dst);
             assert_eq!(call_msg.gas, 2300);
             assert_eq!(call_msg.sender, destination);
-            assert_eq!(call_msg.value, 1.into());
+            assert_eq!(call_msg.value, 1);
             assert_eq!(call_msg.input_data, Bytes::new());
             assert_eq!(
                 r.account_accesses,
@@ -733,7 +744,7 @@ fn callcode_new_account_create() {
     EvmTester::new()
         .destination(call_sender)
         .apply_host_fn(|host, msg| {
-            host.accounts.entry(msg.recipient).or_default().balance = 1.into();
+            host.accounts.entry(msg.recipient).or_default().balance = U256::ONE;
             host.call_result.gas_left = 1;
         })
         .gas(100000)
@@ -748,7 +759,7 @@ fn callcode_new_account_create() {
             assert_eq!(call_msg.depth, 1);
             assert_eq!(call_msg.gas, 52_300);
             assert_eq!(call_msg.sender, call_sender);
-            assert_eq!(call_msg.value, 1.into());
+            assert_eq!(call_msg.value, 1);
         })
         .check()
 }
@@ -761,7 +772,7 @@ fn call_then_oog() {
     let mut code = Bytecode::new().append_bc(
         CallInstruction::call(call_dst)
             .gas(254)
-            .value(0)
+            .value(0_u128)
             .input(0, 0x40)
             .output(0, 0x40),
     );
@@ -801,9 +812,9 @@ fn callcode_then_oog() {
     let mut code = Bytecode::new().append_bc(
         CallInstruction::callcode(call_dst)
             .gas(100)
-            .value(0)
-            .input(0, 3)
-            .output(3, 9),
+            .value(0_u128)
+            .input(0_u128, 3_u128)
+            .output(3_u128, 9_u128),
     );
 
     for _ in 0..4 {
@@ -915,7 +926,7 @@ fn staticcall_input() {
         .code(
             Bytecode::new()
                 .mstore_value(3, 0x010203)
-                .append_bc(CallInstruction::staticcall(0).gas(0xee).input(32, 3)),
+                .append_bc(CallInstruction::staticcall(0_u128).gas(0xee).input(32, 3)),
         )
         .inspect_host(|host, _| {
             let r = host.recorded.lock();
@@ -937,13 +948,13 @@ fn call_with_value_low_gas() {
             })
             .code(
                 Bytecode::new()
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(1)
-                    .pushv(0)
-                    .pushv(0)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
+                    .pushv(1_u8)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
                     .opcode(op)
                     .opcode(OpCode::POP),
             )
@@ -965,13 +976,13 @@ fn call_oog_after_balance_check() {
             })
             .code(
                 Bytecode::new()
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(1)
-                    .pushv(0)
-                    .pushv(0)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
+                    .pushv(1_u8)
+                    .pushv(0_u8)
+                    .pushv(0_u8)
                     .opcode(op)
                     .opcode(OpCode::SELFDESTRUCT),
             )
@@ -994,13 +1005,13 @@ fn call_oog_after_depth_check() {
         t.clone()
             .code(
                 Bytecode::new()
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(1)
-                    .pushv(0)
-                    .pushv(0)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(1_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
                     .opcode(op)
                     .opcode(OpCode::SELFDESTRUCT),
             )
@@ -1011,13 +1022,13 @@ fn call_oog_after_depth_check() {
 
     let t = t.revision(Revision::Tangerine).code(
         Bytecode::new()
-            .pushv(0)
-            .pushv(0)
-            .pushv(0)
-            .pushv(0)
-            .pushv(0)
-            .pushv(0)
-            .pushv(0)
+            .pushv(0_u128)
+            .pushv(0_u128)
+            .pushv(0_u128)
+            .pushv(0_u128)
+            .pushv(0_u128)
+            .pushv(0_u128)
+            .pushv(0_u128)
             .opcode(OpCode::CALL)
             .opcode(OpCode::SELFDESTRUCT),
     );
@@ -1034,10 +1045,10 @@ fn create_oog_after() {
             .revision(Revision::Constantinople)
             .code(
                 Bytecode::new()
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
-                    .pushv(0)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
+                    .pushv(0_u128)
                     .opcode(op)
                     .opcode(OpCode::SELFDESTRUCT),
             )
@@ -1069,7 +1080,7 @@ fn returndatasize() {
         })
         .code(
             Bytecode::new()
-                .pushv(0)
+                .pushv(0_u128)
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::DUP1)
@@ -1077,9 +1088,9 @@ fn returndatasize() {
                 .opcode(OpCode::DUP1)
                 .opcode(OpCode::DELEGATECALL)
                 .opcode(OpCode::RETURNDATASIZE)
-                .mstore8(0)
-                .pushv(1)
-                .pushv(0)
+                .mstore8(0_u8)
+                .pushv(1_u8)
+                .pushv(0_u8)
                 .opcode(OpCode::RETURN),
         );
 

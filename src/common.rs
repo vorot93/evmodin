@@ -1,5 +1,6 @@
 use bytes::Bytes;
-use ethereum_types::*;
+use ethereum_types::{Address, H256};
+use ethnum::U256;
 use serde::Serialize;
 use strum_macros::Display;
 
@@ -274,10 +275,24 @@ impl From<SuccessfulOutput> for Output {
     }
 }
 
+#[inline(always)]
 pub(crate) fn u256_to_address(v: U256) -> Address {
-    H256(v.into()).into()
+    H256(v.to_be_bytes()).into()
 }
 
+#[inline(always)]
 pub(crate) fn address_to_u256(v: Address) -> U256 {
-    U256::from_big_endian(&v.0)
+    U256::from_be_bytes(H256::from(v).0)
+}
+
+#[inline(always)]
+pub(crate) fn u256_from_slice(v: &[u8]) -> U256 {
+    assert!(v.len() <= 32, "invalid len");
+    if v.is_empty() {
+        return U256::ZERO;
+    }
+
+    let mut padded = [0; 32];
+    padded[32 - v.len()..].copy_from_slice(v);
+    U256::from_be_bytes(padded)
 }

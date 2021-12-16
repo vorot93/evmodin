@@ -1,6 +1,6 @@
 use crate::opcode::*;
 use core::iter::repeat;
-use ethereum_types::U256;
+use ethnum::{AsU256, U256};
 use std::ops::{Add, Mul};
 
 /// EVM bytecode builder.
@@ -14,24 +14,29 @@ impl Bytecode {
         Self { inner: Vec::new() }
     }
 
+    #[must_use]
     pub fn append(mut self, b: impl IntoIterator<Item = u8>) -> Self {
         self.inner.append(&mut b.into_iter().collect::<Vec<_>>());
         self
     }
 
+    #[must_use]
     pub fn append_bc(mut self, b: impl Into<Self>) -> Self {
         self.inner.append(&mut b.into().build());
         self
     }
 
+    #[must_use]
     pub fn repeat(mut self, n: usize) -> Self {
         self.inner = repeat(self.inner.into_iter()).take(n).flatten().collect();
         self
     }
 
-    pub fn pushv(self, value: impl Into<U256>) -> Self {
-        let value = value.into();
-        let b = <[u8; 32]>::from(value)
+    #[must_use]
+    pub fn pushv(self, value: impl AsU256) -> Self {
+        let value = value.as_u256();
+        let b = value
+            .to_be_bytes()
             .iter()
             .skip_while(|&&v| v == 0)
             .copied()
@@ -40,6 +45,7 @@ impl Bytecode {
         self.pushb(b)
     }
 
+    #[must_use]
     pub fn pushb(mut self, b: impl IntoIterator<Item = u8>) -> Self {
         let mut b = b.into_iter().collect::<Vec<_>>();
 
@@ -54,70 +60,82 @@ impl Bytecode {
         self
     }
 
+    #[must_use]
     pub fn opcode(mut self, opcode: OpCode) -> Self {
         self.inner.push(opcode.to_u8());
         self
     }
 
-    pub fn ret(mut self, index: impl Into<U256>, size: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn ret(mut self, index: impl AsU256, size: impl AsU256) -> Self {
         self = self.pushv(size);
         self = self.pushv(index);
         self = self.opcode(OpCode::RETURN);
         self
     }
 
-    pub fn revert(mut self, index: impl Into<U256>, size: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn revert(mut self, index: impl AsU256, size: impl AsU256) -> Self {
         self = self.pushv(index);
         self = self.pushv(size);
         self = self.opcode(OpCode::REVERT);
         self
     }
 
-    pub fn mstore(mut self, index: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn mstore(mut self, index: impl AsU256) -> Self {
         self = self.pushv(index);
         self = self.opcode(OpCode::MSTORE);
         self
     }
 
-    pub fn mstore_value(mut self, index: impl Into<U256>, value: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn mstore_value(mut self, index: impl AsU256, value: impl AsU256) -> Self {
         self = self.pushv(value);
         self = self.pushv(index);
         self = self.opcode(OpCode::MSTORE);
         self
     }
 
-    pub fn mstore8(mut self, index: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn mstore8(mut self, index: impl AsU256) -> Self {
         self = self.pushv(index);
         self = self.opcode(OpCode::MSTORE8);
         self
     }
 
-    pub fn mstore8_value(mut self, index: impl Into<U256>, value: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn mstore8_value(mut self, index: impl AsU256, value: impl AsU256) -> Self {
         self = self.pushv(value);
         self = self.pushv(index);
         self = self.opcode(OpCode::MSTORE8);
         self
     }
 
+    #[must_use]
     pub fn ret_top(self) -> Self {
         self.mstore(0).ret(0, 0x20)
     }
 
-    pub fn jump(self, target: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn jump(self, target: impl AsU256) -> Self {
         self.pushv(target).opcode(OpCode::JUMP)
     }
 
+    #[must_use]
     pub fn jumpi(self, target: impl Into<Bytecode>, condition: impl Into<Bytecode>) -> Self {
         self.append(condition.into().build())
             .append(target.into().build())
             .opcode(OpCode::JUMPI)
     }
 
-    pub fn sstore(self, index: impl Into<U256>, value: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn sstore(self, index: impl AsU256, value: impl AsU256) -> Self {
         self.pushv(value).pushv(index).opcode(OpCode::SSTORE)
     }
 
-    pub fn sload(self, index: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn sload(self, index: impl AsU256) -> Self {
         self.pushv(index).opcode(OpCode::SLOAD)
     }
 
@@ -213,32 +231,32 @@ pub struct CallInstruction {
 }
 
 impl CallInstruction {
-    fn new(op: OpCode, address: impl Into<U256>) -> Self {
+    fn new(op: OpCode, address: impl AsU256) -> Self {
         Self {
             op,
-            address: address.into(),
-            gas: 0.into(),
-            value: 0.into(),
-            input: 0.into(),
-            input_size: 0.into(),
-            output: 0.into(),
-            output_size: 0.into(),
+            address: address.as_u256(),
+            gas: 0_u128.into(),
+            value: 0_u128.into(),
+            input: 0_u128.into(),
+            input_size: 0_u128.into(),
+            output: 0_u128.into(),
+            output_size: 0_u128.into(),
         }
     }
 
-    pub fn delegatecall(address: impl Into<U256>) -> Self {
+    pub fn delegatecall(address: impl AsU256) -> Self {
         Self::new(OpCode::DELEGATECALL, address)
     }
 
-    pub fn staticcall(address: impl Into<U256>) -> Self {
+    pub fn staticcall(address: impl AsU256) -> Self {
         Self::new(OpCode::STATICCALL, address)
     }
 
-    pub fn call(address: impl Into<U256>) -> Self {
+    pub fn call(address: impl AsU256) -> Self {
         Self::new(OpCode::CALL, address)
     }
 
-    pub fn callcode(address: impl Into<U256>) -> Self {
+    pub fn callcode(address: impl AsU256) -> Self {
         Self::new(OpCode::CALLCODE, address)
     }
 
@@ -246,23 +264,27 @@ impl CallInstruction {
         self.op
     }
 
-    pub fn gas(mut self, gas: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn gas(mut self, gas: u128) -> Self {
         self.gas = gas.into();
         self
     }
 
-    pub fn value(mut self, value: impl Into<U256>) -> Self {
-        self.value = value.into();
+    #[must_use]
+    pub fn value(mut self, value: impl AsU256) -> Self {
+        self.value = value.as_u256();
         self
     }
 
-    pub fn input(mut self, index: impl Into<U256>, size: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn input(mut self, index: u128, size: u128) -> Self {
         self.input = index.into();
         self.input_size = size.into();
         self
     }
 
-    pub fn output(mut self, index: impl Into<U256>, size: impl Into<U256>) -> Self {
+    #[must_use]
+    pub fn output(mut self, index: u128, size: u128) -> Self {
         self.output = index.into();
         self.output_size = size.into();
         self

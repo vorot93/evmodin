@@ -3,7 +3,8 @@ use ::evmc_vm;
 use ::evmc_vm::{ffi::*, EvmcVm, ExecutionContext, ExecutionMessage, MessageFlags, MessageKind};
 use arrayvec::ArrayVec;
 use bytes::Bytes;
-use ethereum_types::*;
+use ethereum_types::{Address, H256};
+use ethnum::U256;
 use evmc_vm::ExecutionResult;
 use std::convert::TryInto;
 
@@ -37,7 +38,9 @@ impl Convert for U256 {
     type Into = evmc_uint256be;
 
     fn convert(self) -> Self::Into {
-        evmc_uint256be { bytes: self.into() }
+        evmc_uint256be {
+            bytes: self.to_be_bytes(),
+        }
     }
 }
 
@@ -92,7 +95,7 @@ impl Message {
             evmc_call_kind::EVMC_CALLCODE => CallKind::CallCode,
             evmc_call_kind::EVMC_CREATE => CallKind::Create,
             evmc_call_kind::EVMC_CREATE2 => CallKind::Create2 {
-                salt: msg.create2_salt().bytes.into(),
+                salt: U256::from_be_bytes(msg.create2_salt().bytes),
             },
         };
 
@@ -107,7 +110,7 @@ impl Message {
                 .input()
                 .map(|v| v.clone().into())
                 .unwrap_or_else(Bytes::new),
-            value: msg.value().bytes.into(),
+            value: U256::from_be_bytes(msg.value().bytes),
             code_address: msg.code_address().bytes.into(),
         }
     }
@@ -177,9 +180,9 @@ impl<'a> Host for ExecutionContext<'a> {
     }
 
     fn get_storage(&self, address: Address, key: U256) -> U256 {
-        ExecutionContext::get_storage(self, &address.convert(), &key.convert())
-            .bytes
-            .into()
+        U256::from_be_bytes(
+            ExecutionContext::get_storage(self, &address.convert(), &key.convert()).bytes,
+        )
     }
 
     fn set_storage(&mut self, address: Address, key: U256, value: U256) -> StorageStatus {
@@ -198,19 +201,15 @@ impl<'a> Host for ExecutionContext<'a> {
     }
 
     fn get_balance(&self, address: Address) -> U256 {
-        ExecutionContext::get_balance(self, &address.convert())
-            .bytes
-            .into()
+        U256::from_be_bytes(ExecutionContext::get_balance(self, &address.convert()).bytes)
     }
 
     fn get_code_size(&self, address: Address) -> U256 {
-        ExecutionContext::get_code_size(self, &address.convert()).into()
+        (ExecutionContext::get_code_size(self, &address.convert()) as u128).into()
     }
 
     fn get_code_hash(&self, address: Address) -> U256 {
-        ExecutionContext::get_code_hash(self, &address.convert())
-            .bytes
-            .into()
+        U256::from_be_bytes(ExecutionContext::get_code_hash(self, &address.convert()).bytes)
     }
 
     fn copy_code(&self, address: Address, offset: usize, buffer: &mut [u8]) -> usize {
@@ -239,22 +238,22 @@ impl<'a> Host for ExecutionContext<'a> {
         let c = ExecutionContext::get_tx_context(self);
 
         TxContext {
-            tx_gas_price: c.tx_gas_price.bytes.into(),
+            tx_gas_price: U256::from_be_bytes(c.tx_gas_price.bytes),
             tx_origin: c.tx_origin.bytes.into(),
             block_coinbase: c.block_coinbase.bytes.into(),
             block_number: c.block_number.try_into().unwrap(),
             block_timestamp: c.block_timestamp.try_into().unwrap(),
             block_gas_limit: c.block_gas_limit.try_into().unwrap(),
-            block_difficulty: c.block_difficulty.bytes.into(),
-            chain_id: c.chain_id.bytes.into(),
-            block_base_fee: c.block_base_fee.bytes.into(),
+            block_difficulty: U256::from_be_bytes(c.block_difficulty.bytes),
+            chain_id: U256::from_be_bytes(c.chain_id.bytes),
+            block_base_fee: U256::from_be_bytes(c.block_base_fee.bytes),
         }
     }
 
     fn get_block_hash(&self, block_number: u64) -> U256 {
-        ExecutionContext::get_block_hash(self, block_number.try_into().unwrap())
-            .bytes
-            .into()
+        U256::from_be_bytes(
+            ExecutionContext::get_block_hash(self, block_number.try_into().unwrap()).bytes,
+        )
     }
 
     fn emit_log(&mut self, address: Address, data: &[u8], topics: &[U256]) {

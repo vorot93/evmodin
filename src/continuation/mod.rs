@@ -8,7 +8,8 @@ use crate::{
 use arrayvec::ArrayVec;
 use derive_more::From;
 use enum_as_inner::EnumAsInner;
-use ethereum_types::*;
+use ethereum_types::Address;
+use ethnum::U256;
 use std::ops::GeneratorState;
 use std::{convert::Infallible, ops::Generator, pin::Pin};
 

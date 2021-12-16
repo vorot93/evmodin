@@ -1,6 +1,6 @@
 use crate::state::ExecutionState;
 use crate::{interpreter::JumpdestMap, StatusCode};
-use ethereum_types::U256;
+use ethnum::U256;
 
 pub(crate) fn ret(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let offset = *state.stack.get(0);
@@ -35,8 +35,8 @@ pub(crate) fn calldataload(state: &mut ExecutionState) {
     let input_len = state.message.input_data.len();
 
     state.stack.push({
-        if index > U256::from(input_len) {
-            U256::zero()
+        if index > u128::try_from(input_len).unwrap() {
+            U256::ZERO
         } else {
             let index_usize = index.as_usize();
             let end = core::cmp::min(index_usize + 32, input_len);
@@ -44,11 +44,15 @@ pub(crate) fn calldataload(state: &mut ExecutionState) {
             let mut data = [0; 32];
             data[..end - index_usize].copy_from_slice(&state.message.input_data[index_usize..end]);
 
-            data.into()
+            U256::from_be_bytes(data)
         }
     });
 }
 
 pub(crate) fn calldatasize(state: &mut ExecutionState) {
-    state.stack.push(state.message.input_data.len().into());
+    state.stack.push(
+        u128::try_from(state.message.input_data.len())
+            .unwrap()
+            .into(),
+    );
 }

@@ -6,6 +6,7 @@ Fast EVM implementation with support for resumability. Port of [evmone](https://
 ```rust
 use evmodin::{*, host::*, util::*, tracing::*};
 use ethereum_types::*;
+use ethnum::U256;
 use hex_literal::hex;
 
 let my_code = Bytecode::new()
@@ -26,7 +27,7 @@ let message = Message {
     code_address: Address::zero(),
     sender: Address::zero(),
     input_data: vec![].into(),
-    value: U256::zero(),
+    value: U256::ZERO,
 };
 
 assert_eq!(

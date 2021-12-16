@@ -15,7 +15,7 @@ fn basefee_nominal_case() {
     let t = EvmTester::new()
         .revision(Revision::London)
         .apply_host_fn(|host, _| {
-            host.tx_context.block_base_fee = 7.into();
+            host.tx_context.block_base_fee = 7_u128.into();
         });
     t.clone()
         .code(Bytecode::new().opcode(OpCode::BASEFEE).opcode(OpCode::STOP))
@@ -26,6 +26,6 @@ fn basefee_nominal_case() {
     t.code(Bytecode::new().opcode(OpCode::BASEFEE).ret_top())
         .status(StatusCode::Success)
         .gas_used(17)
-        .output_value(7)
+        .output_value(7_u128)
         .check()
 }

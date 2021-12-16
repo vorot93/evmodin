@@ -14,17 +14,17 @@ macro_rules! do_call {
         let gas = $state.stack.pop();
         let dst = u256_to_address($state.stack.pop());
         let value = if $is_static || matches!($kind, CallKind::DelegateCall) {
-            U256::zero()
+            U256::ZERO
         } else {
             $state.stack.pop()
         };
-        let has_value = !value.is_zero();
+        let has_value = value != 0;
         let input_offset = $state.stack.pop();
         let input_size = $state.stack.pop();
         let output_offset = $state.stack.pop();
         let output_size = $state.stack.pop();
 
-        $state.stack.push(U256::zero()); // Assume failure.
+        $state.stack.push(U256::ZERO); // Assume failure.
 
         if $state.evm_revision >= Revision::Berlin
             && ResumeDataVariant::into_access_account_status(
@@ -95,7 +95,7 @@ macro_rules! do_call {
             return Err(StatusCode::OutOfGas);
         }
 
-        if gas < msg.gas.into() {
+        if gas < u128::try_from(msg.gas).unwrap() {
             msg.gas = gas.as_usize() as i64;
         }
 
@@ -132,9 +132,9 @@ macro_rules! do_call {
             .output;
             $state.return_data = result.output_data.clone();
             *$state.stack.get_mut(0) = if matches!(result.status_code, StatusCode::Success) {
-                U256::one()
+                U256::ONE
             } else {
-                U256::zero()
+                U256::ZERO
             };
 
             if let Some(MemoryRegion { offset, size }) = output_region {
@@ -155,7 +155,7 @@ macro_rules! do_call {
 #[macro_export]
 macro_rules! do_create {
     ($state:expr, $create2:expr) => {{
-        use ethereum_types::U256;
+        use ethnum::U256;
         use $crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -189,11 +189,11 @@ macro_rules! do_create {
             None
         };
 
-        $state.stack.push(U256::zero());
+        $state.stack.push(U256::ZERO);
         $state.return_data.clear();
 
         if $state.message.depth < 1024
-            && !(!endowment.is_zero()
+            && !(endowment != 0
                 && ResumeDataVariant::into_balance({
                     yield InterruptDataVariant::GetBalance(GetBalance {
                         address: $state.message.recipient,
@@ -211,7 +211,7 @@ macro_rules! do_create {
                 },
 
                 salt,
-                initcode: if !init_code_size.is_zero() {
+                initcode: if init_code_size != 0 {
                     $state.memory[init_code_offset.as_usize()
                         ..init_code_offset.as_usize() + init_code_size.as_usize()]
                         .to_vec()

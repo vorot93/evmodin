@@ -11,9 +11,12 @@ bytes = { version = "1", default-features = false, features = ["serde"] }
 derive_more = "0.99"
 educe = { version = "0.4", default-features = false, features = ["Debug"] }
 enum-as-inner = "0.3"
+ethnum = { git = "https://github.com/vorot93/ethnum-rs", branch = "staging", features = [
+    "serde",
+] }
 evmc-declare = { git = "https://github.com/ethereum/evmc", tag = "v10.0.0-alpha.1", optional = true }
 evmc-vm = { git = "https://github.com/ethereum/evmc", tag = "v10.0.0-alpha.1", optional = true }
-i256 = { git = "https://github.com/vorot93/rust-i256" }
+i256 = { git = "https://github.com/vorot93/rust-i256", branch = "ethnum" }
 ethereum-types = { version = "0.12", default-features = false }
 getset = "0.1"
 hex = "0.4"

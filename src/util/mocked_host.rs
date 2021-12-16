@@ -1,6 +1,7 @@
 use crate::{host::*, *};
 use bytes::Bytes;
 use ethereum_types::*;
+use ethnum::U256;
 use hex_literal::hex;
 use parking_lot::Mutex;
 use std::{cmp::min, collections::HashMap};
@@ -89,17 +90,17 @@ impl Default for MockedHost {
         Self {
             accounts: Default::default(),
             tx_context: TxContext {
-                tx_gas_price: U256::zero(),
+                tx_gas_price: U256::ZERO,
                 tx_origin: Address::zero(),
                 block_coinbase: Address::zero(),
                 block_number: 0,
                 block_timestamp: 0,
                 block_gas_limit: 0,
-                block_difficulty: U256::zero(),
-                chain_id: U256::zero(),
-                block_base_fee: U256::zero(),
+                block_difficulty: U256::ZERO,
+                chain_id: U256::ZERO,
+                block_base_fee: U256::ZERO,
             },
-            block_hash: U256::zero(),
+            block_hash: U256::ZERO,
             call_result: Output {
                 status_code: StatusCode::Success,
                 gas_left: 0,
@@ -131,7 +132,7 @@ impl crate::Host for MockedHost {
         self.accounts
             .get(&address)
             .and_then(|account| account.storage.get(&key).map(|value| value.value))
-            .unwrap_or_else(U256::zero)
+            .unwrap_or(U256::ZERO)
     }
 
     fn set_storage(
@@ -163,9 +164,9 @@ impl crate::Host for MockedHost {
 
         let status = if !old.dirty {
             old.dirty = true;
-            if old.value.is_zero() {
+            if old.value == 0 {
                 StorageStatus::Added
-            } else if !value.is_zero() {
+            } else if value != 0 {
                 StorageStatus::Modified
             } else {
                 StorageStatus::Deleted
@@ -179,22 +180,22 @@ impl crate::Host for MockedHost {
         status
     }
 
-    fn get_balance(&self, address: ethereum_types::Address) -> ethereum_types::U256 {
+    fn get_balance(&self, address: ethereum_types::Address) -> ethnum::U256 {
         self.recorded.lock().record_account_access(address);
 
         self.accounts
             .get(&address)
             .map(|acc| acc.balance)
-            .unwrap_or_else(U256::zero)
+            .unwrap_or(U256::ZERO)
     }
 
-    fn get_code_size(&self, address: ethereum_types::Address) -> ethereum_types::U256 {
+    fn get_code_size(&self, address: ethereum_types::Address) -> ethnum::U256 {
         self.recorded.lock().record_account_access(address);
 
         self.accounts
             .get(&address)
-            .map(|acc| acc.code.len().into())
-            .unwrap_or_else(U256::zero)
+            .map(|acc| u128::try_from(acc.code.len()).unwrap().into())
+            .unwrap_or(U256::ZERO)
     }
 
     fn get_code_hash(&self, address: ethereum_types::Address) -> U256 {
@@ -203,7 +204,7 @@ impl crate::Host for MockedHost {
         self.accounts
             .get(&address)
             .map(|acc| acc.code_hash)
-            .unwrap_or_else(U256::zero)
+            .unwrap_or(U256::ZERO)
     }
 
     fn copy_code(&self, address: Address, code_offset: usize, buffer: &mut [u8]) -> usize {

@@ -15,9 +15,9 @@ fn loop_full_of_jumpdests() {
 
     let code = Bytecode::new()
         .pushv(15)
-        .pushv(0)
+        .pushv(0_u128)
         .opcode(OpCode::NOT)
-        .pushv(0)
+        .pushv(0_u128)
         .opcode(OpCode::CALLDATALOAD)
         .opcode(OpCode::DUP1)
         .opcode(OpCode::ISZERO)

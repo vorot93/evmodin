@@ -7,7 +7,7 @@ use crate::{
     tracing::Tracer,
     *,
 };
-use ethereum_types::U256;
+use ethnum::U256;
 use std::{ops::Generator, sync::Arc};
 
 fn check_requirements(
@@ -39,7 +39,7 @@ pub struct JumpdestMap(Arc<[bool]>);
 
 impl JumpdestMap {
     pub fn contains(&self, dst: U256) -> bool {
-        dst < self.0.len().into() && self.0[dst.as_usize()]
+        dst < u128::try_from(self.0.len()).unwrap() && self.0[dst.as_usize()]
     }
 }
 
@@ -483,7 +483,7 @@ fn interpreter_producer(
                     continue;
                 }
                 OpCode::JUMPI => {
-                    if !state.stack.get(1).is_zero() {
+                    if *state.stack.get(1) != 0 {
                         pc = op_jump(&mut state, &s.jumpdest_map)?;
                         state.stack.pop();
 
@@ -493,7 +493,7 @@ fn interpreter_producer(
                         state.stack.pop();
                     }
                 }
-                OpCode::PC => state.stack.push(pc.into()),
+                OpCode::PC => state.stack.push(u128::try_from(pc).unwrap().into()),
                 OpCode::MSIZE => memory::msize(&mut state),
                 OpCode::SLOAD => {
                     sload!(state);
@@ -501,7 +501,9 @@ fn interpreter_producer(
                 OpCode::SSTORE => {
                     sstore!(state);
                 }
-                OpCode::GAS => state.stack.push(state.gas_left.into()),
+                OpCode::GAS => state
+                    .stack
+                    .push(u128::try_from(state.gas_left).unwrap().into()),
                 OpCode::JUMPDEST => {}
                 OpCode::PUSH1
                 | OpCode::PUSH2

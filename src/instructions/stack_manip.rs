@@ -1,8 +1,7 @@
-use crate::state::*;
-use ethereum_types::U256;
+use crate::{common::*, state::*};
 
 pub(crate) fn push(stack: &mut Stack, code: &[u8], push_len: usize) {
-    stack.push(U256::from_big_endian(&code[..push_len]));
+    stack.push(u256_from_slice(&code[..push_len]));
 }
 
 pub(crate) fn dup(stack: &mut Stack, height: usize) {

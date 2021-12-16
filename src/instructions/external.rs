@@ -1,5 +1,5 @@
 use crate::{common::address_to_u256, host::*, state::ExecutionState};
-use ethereum_types::U256;
+use ethnum::U256;
 
 pub(crate) fn address(state: &mut ExecutionState) {
     state.stack.push(address_to_u256(state.message.recipient));
@@ -170,8 +170,8 @@ macro_rules! blockhash {
                 .block_number;
         let lower_bound = upper_bound.saturating_sub(256);
 
-        let mut header = U256::zero();
-        if number <= u64::MAX.into() {
+        let mut header = U256::ZERO;
+        if number <= u128::from(u64::MAX) {
             let n = number.as_u64();
             if (lower_bound..upper_bound).contains(&n) {
                 header = ResumeDataVariant::into_block_hash({
@@ -398,7 +398,7 @@ macro_rules! selfdestruct {
                     })
                     .unwrap()
                     .balance
-                    .is_zero()
+                        == 0
                 })
         {
             // After TANGERINE_WHISTLE apply additional cost of
@@ -437,7 +437,7 @@ mod tests {
     #[test]
     fn u256_to_address_conversion() {
         assert_eq!(
-            u256_to_address(0x42.into()),
+            u256_to_address(0x42_u128.into()),
             Address::from(hex!("0000000000000000000000000000000000000042"))
         );
     }
