@@ -201,7 +201,7 @@ macro_rules! do_log {
         let size = $state.stack.pop();
 
         let region =
-            memory::verify_memory_region($state, offset, size).map_err(|_| StatusCode::OutOfGas)?;
+            memory::get_memory_region($state, offset, size).map_err(|_| StatusCode::OutOfGas)?;
 
         if let Some(region) = &region {
             let cost = region.size.get() as i64 * 8;
@@ -231,7 +231,7 @@ macro_rules! do_log {
             })
         };
 
-        assert!(matches!(r, ResumeDataVariant::Empty));
+        debug_assert!(matches!(r, ResumeDataVariant::Empty));
     }};
 }
 
@@ -418,13 +418,11 @@ macro_rules! selfdestruct {
             }
         }
 
-        assert!(matches!(
-            yield InterruptDataVariant::Selfdestruct(Selfdestruct {
-                address: $state.message.recipient,
-                beneficiary,
-            }),
-            ResumeDataVariant::Empty
-        ));
+        let r = yield InterruptDataVariant::Selfdestruct(Selfdestruct {
+            address: $state.message.recipient,
+            beneficiary,
+        });
+        debug_assert!(matches!(r, ResumeDataVariant::Empty));
     }};
 }
 

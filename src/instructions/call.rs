@@ -40,9 +40,9 @@ macro_rules! do_call {
             }
         }
 
-        let input_region = memory::verify_memory_region($state, input_offset, input_size)
+        let input_region = memory::get_memory_region($state, input_offset, input_size)
             .map_err(|_| StatusCode::OutOfGas)?;
-        let output_region = memory::verify_memory_region($state, output_offset, output_size)
+        let output_region = memory::get_memory_region($state, output_offset, output_size)
             .map_err(|_| StatusCode::OutOfGas)?;
 
         let mut msg = Message {
@@ -170,7 +170,7 @@ macro_rules! do_create {
         let init_code_offset = $state.stack.pop();
         let init_code_size = $state.stack.pop();
 
-        let region = memory::verify_memory_region($state, init_code_offset, init_code_size)
+        let region = memory::get_memory_region($state, init_code_offset, init_code_size)
             .map_err(|_| StatusCode::OutOfGas)?;
 
         let salt = if $create2 {

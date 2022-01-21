@@ -37,16 +37,14 @@ pub trait Interrupt: sealed::Sealed {
     fn resume(self, resume_data: Self::ResumeData) -> InterruptVariant;
 }
 
-type InnerCoroutine = Pin<
-    Box<
-        dyn Generator<
-                ResumeDataVariant,
-                Yield = InterruptDataVariant,
-                Return = Result<SuccessfulOutput, StatusCode>,
-            > + Send
-            + Sync
-            + Unpin,
-    >,
+pub(crate) type InnerCoroutine = Box<
+    dyn Generator<
+            ResumeDataVariant,
+            Yield = InterruptDataVariant,
+            Return = Result<SuccessfulOutput, StatusCode>,
+        > + Send
+        + Sync
+        + Unpin,
 >;
 
 fn resume_interrupt(mut inner: InnerCoroutine, resume_data: ResumeDataVariant) -> InterruptVariant {

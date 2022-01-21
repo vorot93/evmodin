@@ -1,50 +1,60 @@
 use crate::common::{Message, Revision};
 use arrayvec::ArrayVec;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
+use derive_more::{Deref, DerefMut};
 use ethnum::U256;
 use getset::{Getters, MutGetters};
 use serde::Serialize;
 
-const SIZE: usize = 1024;
+pub const STACK_SIZE: usize = 1024;
 
 /// EVM stack.
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct Stack(pub ArrayVec<U256, SIZE>);
+pub struct Stack(pub ArrayVec<U256, STACK_SIZE>);
 
 impl Stack {
-    pub const fn limit() -> usize {
-        SIZE
+    #[inline(always)]
+    pub const fn new() -> Self {
+        Self(ArrayVec::new_const())
     }
 
+    #[inline(always)]
     fn get_pos(&self, pos: usize) -> usize {
         self.len() - 1 - pos
     }
 
+    #[inline(always)]
     pub fn get(&self, pos: usize) -> &U256 {
         &self.0[self.get_pos(pos)]
     }
 
+    #[inline(always)]
     pub fn get_mut(&mut self, pos: usize) -> &mut U256 {
         let pos = self.get_pos(pos);
         &mut self.0[pos]
     }
 
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline(always)]
     pub fn push(&mut self, v: U256) {
         unsafe { self.0.push_unchecked(v) }
     }
 
+    #[inline(always)]
     pub fn pop(&mut self) -> U256 {
         self.0.pop().expect("underflow")
     }
 
+    #[inline(always)]
     pub fn swap_top(&mut self, pos: usize) {
         let top = self.0.len() - 1;
         let pos = self.get_pos(pos);
@@ -52,7 +62,33 @@ impl Stack {
     }
 }
 
-pub type Memory = Vec<u8>;
+const PAGE_SIZE: usize = 4 * 1024;
+
+#[derive(Clone, Debug, Deref, DerefMut)]
+pub struct Memory(BytesMut);
+
+impl Memory {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self(BytesMut::with_capacity(PAGE_SIZE))
+    }
+
+    #[inline(always)]
+    pub fn grow(&mut self, size: usize) {
+        let cap = self.0.capacity();
+        if size > cap {
+            let additional_pages = ((size - cap) + PAGE_SIZE - 1) / PAGE_SIZE;
+            self.0.reserve(PAGE_SIZE * additional_pages);
+        }
+        self.0.resize(size, 0);
+    }
+}
+
+impl Default for Memory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// EVM execution state.
 #[derive(Clone, Debug, Getters, MutGetters)]
@@ -74,8 +110,8 @@ impl ExecutionState {
     pub fn new(message: Message, evm_revision: Revision) -> Self {
         Self {
             gas_left: message.gas,
-            stack: Default::default(),
-            memory: Memory::with_capacity(4 * 1024),
+            stack: Stack::default(),
+            memory: Memory::new(),
             message,
             evm_revision,
             return_data: Default::default(),

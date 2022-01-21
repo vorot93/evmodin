@@ -3,30 +3,35 @@ use ethereum_types::U512;
 use ethnum::U256;
 use i256::I256;
 
+#[inline(always)]
 pub(crate) fn add(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
     stack.push(a.overflowing_add(b).0);
 }
 
+#[inline(always)]
 pub(crate) fn mul(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
     stack.push(a.overflowing_mul(b).0);
 }
 
+#[inline(always)]
 pub(crate) fn sub(stack: &mut Stack) {
     let a = stack.pop();
     let b = stack.pop();
     stack.push(a.overflowing_sub(b).0);
 }
 
+#[inline(always)]
 pub(crate) fn div(stack: &mut Stack) {
     let a = stack.pop();
-    let b = stack.pop();
-    stack.push(if b == 0 { U256::ZERO } else { a / b });
+    let b = stack.get_mut(0);
+    *b = if *b == 0 { U256::ZERO } else { a / *b };
 }
 
+#[inline(always)]
 pub(crate) fn sdiv(stack: &mut Stack) {
     let a = I256::from(stack.pop());
     let b = I256::from(stack.pop());
@@ -34,25 +39,24 @@ pub(crate) fn sdiv(stack: &mut Stack) {
     stack.push(v.into());
 }
 
+#[inline(always)]
 pub(crate) fn modulo(stack: &mut Stack) {
     let a = stack.pop();
-    let b = stack.pop();
-    let v = if b == 0 { U256::ZERO } else { a % b };
-    stack.push(v);
+    let b = stack.get_mut(0);
+    *b = if *b == 0 { U256::ZERO } else { a % *b };
 }
 
+#[inline(always)]
 pub(crate) fn smod(stack: &mut Stack) {
     let a = stack.pop();
-    let b = stack.pop();
+    let b = stack.get_mut(0);
 
-    let v = if b == 0 {
-        U256::ZERO
+    if *b == 0 {
+        *b = U256::ZERO
     } else {
-        let v = I256::from(a) % I256::from(b);
-        v.into()
+        let v = I256::from(a) % I256::from(*b);
+        *b = v.into();
     };
-
-    stack.push(v);
 }
 
 pub(crate) fn addmod(stack: &mut Stack) {
@@ -98,14 +102,13 @@ pub(crate) fn mulmod(stack: &mut Stack) {
 }
 
 fn log2floor(value: U256) -> u64 {
-    assert!(value != 0);
+    debug_assert!(value != 0);
     let mut l: u64 = 256;
-    for i in 0..=1 {
-        let i = 1 - i;
-        if value.0[i] == 0 {
+    for v in [value.high(), value.low()] {
+        if *v == 0 {
             l -= 128;
         } else {
-            l -= value.0[i].leading_zeros() as u64;
+            l -= v.leading_zeros() as u64;
             if l == 0 {
                 return l;
             } else {
@@ -151,21 +154,13 @@ pub(crate) fn exp(state: &mut ExecutionState) -> Result<(), StatusCode> {
 
 pub(crate) fn signextend(stack: &mut Stack) {
     let a = stack.pop();
-    let b = stack.pop();
+    let b = stack.get_mut(0);
 
-    let v = if a < 32 {
-        let bit_index = (8 * a.as_u32() + 7) as usize;
+    if a < 32 {
+        let bit_index = (8 * a.as_u8() + 7) as u16;
         let (hi, lo) = b.into_words();
         let bit = if bit_index > 0x7f { hi } else { lo } & (1 << (bit_index % 128)) != 0;
         let mask = (U256::ONE << bit_index) - U256::ONE;
-        if bit {
-            b | !mask
-        } else {
-            b & mask
-        }
-    } else {
-        b
-    };
-
-    stack.push(v);
+        *b = if bit { *b | !mask } else { *b & mask }
+    }
 }

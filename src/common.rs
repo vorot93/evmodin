@@ -1,3 +1,4 @@
+use arrayref::array_ref;
 use bytes::Bytes;
 use ethereum_types::{Address, H256};
 use ethnum::U256;
@@ -287,12 +288,14 @@ pub(crate) fn address_to_u256(v: Address) -> U256 {
 
 #[inline(always)]
 pub(crate) fn u256_from_slice(v: &[u8]) -> U256 {
-    assert!(v.len() <= 32, "invalid len");
-    if v.is_empty() {
-        return U256::ZERO;
+    debug_assert!(v.len() <= 32, "invalid len");
+    match v.len() {
+        0 => U256::ZERO,
+        32 => U256::from_be_bytes(*array_ref!(v, 0, 32)),
+        _ => {
+            let mut padded = [0; 32];
+            padded[32 - v.len()..].copy_from_slice(v);
+            U256::from_be_bytes(padded)
+        }
     }
-
-    let mut padded = [0; 32];
-    padded[32 - v.len()..].copy_from_slice(v);
-    U256::from_be_bytes(padded)
 }

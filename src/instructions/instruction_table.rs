@@ -23,7 +23,7 @@ pub static INSTRUCTION_TABLES: Lazy<InstructionTables> = Lazy::new(|| {
 
                 // Because any instruction can increase stack height at most of 1,
                 // stack overflow can only happen if stack height is already at the limit.
-                assert!(properties::PROPERTIES[opcode].unwrap().stack_height_change <= 1);
+                debug_assert!(properties::PROPERTIES[opcode].unwrap().stack_height_change <= 1);
 
                 table[revision as usize][opcode] = Some(InstructionTableEntry {
                     gas_cost: cost,

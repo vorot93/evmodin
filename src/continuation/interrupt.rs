@@ -4,16 +4,7 @@ macro_rules! interrupt {
     ( $(#[$outer:meta])* $name:ident, $data:ty => $resume_with:ty) => {
 		$(#[$outer])*
         pub struct $name {
-            pub(crate) inner: ::core::pin::Pin<
-                Box<
-                    dyn ::core::ops::Generator<ResumeDataVariant,
-                            Yield = InterruptDataVariant,
-                            Return = Result<SuccessfulOutput, StatusCode>,
-                        > + Send
-                        + Sync
-                        + Unpin,
-                >,
-            >,
+            pub(crate) inner: InnerCoroutine,
             pub(crate) data: $data,
         }
 

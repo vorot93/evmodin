@@ -8,9 +8,9 @@ pub(crate) fn byte(stack: &mut Stack) {
 
     let mut ret = U256::ZERO;
 
-    for i in 0..256 {
+    for i in 0..=255 {
         if i < 8 && a < 32 {
-            let o: usize = a.as_usize();
+            let o = a.as_u8();
             let t = 255 - (7 - i + 8 * o);
             let bit_mask = U256::ONE << t;
             let value = (b & bit_mask) >> t;
@@ -21,30 +21,28 @@ pub(crate) fn byte(stack: &mut Stack) {
     stack.push(ret)
 }
 
+#[inline(always)]
 pub(crate) fn shl(stack: &mut Stack) {
     let shift = stack.pop();
-    let value = stack.pop();
+    let value = stack.get_mut(0);
 
-    let ret = if value == 0 || shift >= 256 {
-        U256::ZERO
+    if *value == 0 || shift >= 256 {
+        *value = U256::ZERO;
     } else {
-        value << shift.as_usize()
+        *value <<= shift.as_u8()
     };
-
-    stack.push(ret)
 }
 
+#[inline(always)]
 pub(crate) fn shr(stack: &mut Stack) {
     let shift = stack.pop();
-    let value = stack.pop();
+    let value = stack.get_mut(0);
 
-    let ret = if value == 0 || shift >= 256 {
-        U256::ZERO
+    if *value == 0 || shift >= 256 {
+        *value = U256::ZERO
     } else {
-        value >> shift.as_u8()
+        *value >>= shift.as_u8()
     };
-
-    stack.push(ret)
 }
 
 pub(crate) fn sar(stack: &mut Stack) {
@@ -59,7 +57,7 @@ pub(crate) fn sar(stack: &mut Stack) {
             Sign::Minus => I256(Sign::Minus, U256::ONE).into(),
         }
     } else {
-        let shift = shift.as_usize();
+        let shift = shift.as_u8();
 
         match value.0 {
             Sign::Plus | Sign::NoSign => value.1 >> shift,

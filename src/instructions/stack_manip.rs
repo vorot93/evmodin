@@ -1,17 +1,34 @@
 use crate::{common::*, state::*};
+use arrayref::array_ref;
+use ethnum::U256;
 
-pub(crate) fn push(stack: &mut Stack, code: &[u8], push_len: usize) {
-    stack.push(u256_from_slice(&code[..push_len]));
+#[inline(always)]
+pub(crate) fn push<const LEN: usize>(stack: &mut Stack, code: &[u8]) -> usize {
+    stack.push(u256_from_slice(&code[..LEN]));
+    LEN
 }
 
-pub(crate) fn dup(stack: &mut Stack, height: usize) {
-    stack.push(*stack.get(height - 1));
+#[inline(always)]
+pub(crate) fn push1(stack: &mut Stack, v: u8) {
+    stack.push(v.into());
 }
 
-pub(crate) fn swap(stack: &mut Stack, height: usize) {
-    stack.swap_top(height);
+#[inline(always)]
+pub(crate) fn push32(stack: &mut Stack, code: &[u8]) {
+    stack.push(U256::from_be_bytes(*array_ref!(code, 0, 32)));
 }
 
+#[inline(always)]
+pub(crate) fn dup<const HEIGHT: usize>(stack: &mut Stack) {
+    stack.push(*stack.get(HEIGHT - 1));
+}
+
+#[inline(always)]
+pub(crate) fn swap<const HEIGHT: usize>(stack: &mut Stack) {
+    stack.swap_top(HEIGHT);
+}
+
+#[inline(always)]
 pub(crate) fn pop(stack: &mut Stack) {
     stack.pop();
 }

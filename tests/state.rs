@@ -528,15 +528,12 @@ fn selfdestruct() {
         .status(StatusCode::Success)
         .gas_used(5003)
         .inspect_host(|host, _| {
-            assert_eq!(host.recorded.lock().selfdestructs.len(), 1);
             assert_eq!(
-                host.recorded
-                    .lock()
-                    .selfdestructs
-                    .last()
-                    .unwrap()
-                    .beneficiary[19],
-                9
+                host.recorded.lock().selfdestructs,
+                [SelfdestructRecord {
+                    selfdestructed: Address::zero(),
+                    beneficiary: Address::from(hex!("0000000000000000000000000000000000000009"))
+                }]
             );
         })
         .check();
@@ -547,15 +544,12 @@ fn selfdestruct() {
         .status(StatusCode::Success)
         .gas_used(3)
         .inspect_host(|host, _| {
-            assert_eq!(host.recorded.lock().selfdestructs.len(), 1);
             assert_eq!(
-                host.recorded
-                    .lock()
-                    .selfdestructs
-                    .last()
-                    .unwrap()
-                    .beneficiary[19],
-                7
+                host.recorded.lock().selfdestructs,
+                [SelfdestructRecord {
+                    selfdestructed: Address::zero(),
+                    beneficiary: Address::from(hex!("0000000000000000000000000000000000000007"))
+                }]
             );
         })
         .check();
@@ -566,15 +560,12 @@ fn selfdestruct() {
         .status(StatusCode::Success)
         .gas_used(30003)
         .inspect_host(|host, _| {
-            assert_eq!(host.recorded.lock().selfdestructs.len(), 1);
             assert_eq!(
-                host.recorded
-                    .lock()
-                    .selfdestructs
-                    .last()
-                    .unwrap()
-                    .beneficiary[19],
-                8
+                host.recorded.lock().selfdestructs,
+                [SelfdestructRecord {
+                    selfdestructed: Address::zero(),
+                    beneficiary: Address::from(hex!("0000000000000000000000000000000000000008"))
+                }]
             );
         })
         .check();
@@ -590,6 +581,7 @@ fn selfdestruct_with_balance() {
     let mut t = EvmTester::new()
         .code(code)
         .destination(hex!("000000000000000000000000000000000000005e"))
+        .collect_traces(true)
         .apply_host_fn(|host, msg| {
             host.accounts.entry(msg.recipient).or_default().balance = U256::ZERO;
         });

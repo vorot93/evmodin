@@ -15,7 +15,9 @@ fn check_requirements(
     state: &mut ExecutionState,
     op: OpCode,
 ) -> Result<(), StatusCode> {
-    let metrics = &instruction_table[op.to_usize()].ok_or(StatusCode::UndefinedInstruction)?;
+    let metrics = instruction_table[op.to_usize()]
+        .as_ref()
+        .ok_or(StatusCode::UndefinedInstruction)?;
 
     state.gas_left -= metrics.gas_cost as i64;
     if state.gas_left < 0 {
@@ -23,7 +25,7 @@ fn check_requirements(
     }
 
     let stack_size = state.stack.len();
-    if stack_size == Stack::limit() {
+    if stack_size == STACK_SIZE {
         if metrics.can_overflow_stack {
             return Err(StatusCode::StackOverflow);
         }
@@ -150,11 +152,12 @@ impl AnalyzedCode {
         revision: Revision,
     ) -> ExecutionStartInterrupt {
         let code = self.clone();
-        let inner = Box::pin(interpreter_producer(
-            code,
-            ExecutionState::new(message, revision),
-            trace,
-        ));
+        let state = ExecutionState::new(message, revision);
+        let inner: InnerCoroutine = if trace {
+            Box::new(interpreter_producer::<true>(code, state))
+        } else {
+            Box::new(interpreter_producer::<false>(code, state))
+        };
 
         ExecutionStartInterrupt { inner, data: () }
     }
@@ -272,10 +275,9 @@ impl ExecutionStartInterrupt {
     }
 }
 
-fn interpreter_producer(
+fn interpreter_producer<const TRACE: bool>(
     s: AnalyzedCode,
     mut state: ExecutionState,
-    trace: bool,
 ) -> impl Generator<
     ResumeDataVariant,
     Yield = InterruptDataVariant,
@@ -291,19 +293,21 @@ fn interpreter_producer(
         loop {
             let op = OpCode(s.padded_code[pc]);
 
-            // Do not print stop on the final STOP
-            if trace && pc < s.code.len() {
-                if let Some(modifier) = {
-                    yield InterruptDataVariant::InstructionStart(Box::new(InstructionStart {
-                        pc,
-                        opcode: op,
-                        state: state.clone(),
-                    }))
-                }
-                .as_state_modifier()
-                .unwrap()
-                {
-                    (modifier)(&mut state)
+            if TRACE {
+                // Do not print stop on the final STOP
+                if pc < s.code.len() {
+                    if let Some(modifier) = {
+                        yield InterruptDataVariant::InstructionStart(Box::new(InstructionStart {
+                            pc,
+                            opcode: op,
+                            state: state.clone(),
+                        }))
+                    }
+                    .as_state_modifier()
+                    .unwrap()
+                    {
+                        (modifier)(&mut state)
+                    }
                 }
             }
 
@@ -465,18 +469,10 @@ fn interpreter_producer(
                 OpCode::SELFBALANCE => {
                     selfbalance!(state);
                 }
-                OpCode::POP => {
-                    stack_manip::pop(&mut state.stack);
-                }
-                OpCode::MLOAD => {
-                    memory::mload(&mut state)?;
-                }
-                OpCode::MSTORE => {
-                    memory::mstore(&mut state)?;
-                }
-                OpCode::MSTORE8 => {
-                    memory::mstore8(&mut state)?;
-                }
+                OpCode::POP => pop(&mut state.stack),
+                OpCode::MLOAD => memory::mload(&mut state)?,
+                OpCode::MSTORE => memory::mstore(&mut state)?,
+                OpCode::MSTORE8 => memory::mstore8(&mut state)?,
                 OpCode::JUMP => {
                     pc = op_jump(&mut state, &s.jumpdest_map)?;
 
@@ -505,87 +501,81 @@ fn interpreter_producer(
                     .stack
                     .push(u128::try_from(state.gas_left).unwrap().into()),
                 OpCode::JUMPDEST => {}
-                OpCode::PUSH1
-                | OpCode::PUSH2
-                | OpCode::PUSH3
-                | OpCode::PUSH4
-                | OpCode::PUSH5
-                | OpCode::PUSH6
-                | OpCode::PUSH7
-                | OpCode::PUSH8
-                | OpCode::PUSH9
-                | OpCode::PUSH10
-                | OpCode::PUSH11
-                | OpCode::PUSH12
-                | OpCode::PUSH13
-                | OpCode::PUSH14
-                | OpCode::PUSH15
-                | OpCode::PUSH16
-                | OpCode::PUSH17
-                | OpCode::PUSH18
-                | OpCode::PUSH19
-                | OpCode::PUSH20
-                | OpCode::PUSH21
-                | OpCode::PUSH22
-                | OpCode::PUSH23
-                | OpCode::PUSH24
-                | OpCode::PUSH25
-                | OpCode::PUSH26
-                | OpCode::PUSH27
-                | OpCode::PUSH28
-                | OpCode::PUSH29
-                | OpCode::PUSH30
-                | OpCode::PUSH31
-                | OpCode::PUSH32 => {
-                    let push_len = op.push_size().unwrap().into();
-                    push(&mut state.stack, &s.padded_code[pc + 1..], push_len);
-                    pc += push_len;
+                OpCode::PUSH1 => {
+                    push1(&mut state.stack, s.padded_code[pc + 1]);
+                    pc += 1;
+                }
+                OpCode::PUSH2 => pc += push::<2>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH3 => pc += push::<3>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH4 => pc += push::<4>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH5 => pc += push::<5>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH6 => pc += push::<6>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH7 => pc += push::<7>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH8 => pc += push::<8>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH9 => pc += push::<9>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH10 => pc += push::<10>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH11 => pc += push::<11>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH12 => pc += push::<12>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH13 => pc += push::<13>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH14 => pc += push::<14>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH15 => pc += push::<15>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH16 => pc += push::<16>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH17 => pc += push::<17>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH18 => pc += push::<18>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH19 => pc += push::<19>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH20 => pc += push::<20>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH21 => pc += push::<21>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH22 => pc += push::<22>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH23 => pc += push::<23>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH24 => pc += push::<24>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH25 => pc += push::<25>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH26 => pc += push::<26>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH27 => pc += push::<27>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH28 => pc += push::<28>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH29 => pc += push::<29>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH30 => pc += push::<30>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH31 => pc += push::<31>(&mut state.stack, &s.padded_code[pc + 1..]),
+                OpCode::PUSH32 => {
+                    push32(&mut state.stack, &s.padded_code[pc + 1..]);
+                    pc += 32;
                 }
 
-                OpCode::DUP1
-                | OpCode::DUP2
-                | OpCode::DUP3
-                | OpCode::DUP4
-                | OpCode::DUP5
-                | OpCode::DUP6
-                | OpCode::DUP7
-                | OpCode::DUP8
-                | OpCode::DUP9
-                | OpCode::DUP10
-                | OpCode::DUP11
-                | OpCode::DUP12
-                | OpCode::DUP13
-                | OpCode::DUP14
-                | OpCode::DUP15
-                | OpCode::DUP16 => {
-                    dup(
-                        &mut state.stack,
-                        op.to_usize() - OpCode::DUP1.to_usize() + 1,
-                    );
-                }
+                OpCode::DUP1 => dup::<1>(&mut state.stack),
+                OpCode::DUP2 => dup::<2>(&mut state.stack),
+                OpCode::DUP3 => dup::<3>(&mut state.stack),
+                OpCode::DUP4 => dup::<4>(&mut state.stack),
+                OpCode::DUP5 => dup::<5>(&mut state.stack),
+                OpCode::DUP6 => dup::<6>(&mut state.stack),
+                OpCode::DUP7 => dup::<7>(&mut state.stack),
+                OpCode::DUP8 => dup::<8>(&mut state.stack),
+                OpCode::DUP9 => dup::<9>(&mut state.stack),
+                OpCode::DUP10 => dup::<10>(&mut state.stack),
+                OpCode::DUP11 => dup::<11>(&mut state.stack),
+                OpCode::DUP12 => dup::<12>(&mut state.stack),
+                OpCode::DUP13 => dup::<13>(&mut state.stack),
+                OpCode::DUP14 => dup::<14>(&mut state.stack),
+                OpCode::DUP15 => dup::<15>(&mut state.stack),
+                OpCode::DUP16 => dup::<16>(&mut state.stack),
 
-                OpCode::SWAP1
-                | OpCode::SWAP2
-                | OpCode::SWAP3
-                | OpCode::SWAP4
-                | OpCode::SWAP5
-                | OpCode::SWAP6
-                | OpCode::SWAP7
-                | OpCode::SWAP8
-                | OpCode::SWAP9
-                | OpCode::SWAP10
-                | OpCode::SWAP11
-                | OpCode::SWAP12
-                | OpCode::SWAP13
-                | OpCode::SWAP14
-                | OpCode::SWAP15
-                | OpCode::SWAP16 => swap(
-                    &mut state.stack,
-                    op.to_usize() - OpCode::SWAP1.to_usize() + 1,
-                ),
+                OpCode::SWAP1 => swap::<1>(&mut state.stack),
+                OpCode::SWAP2 => swap::<2>(&mut state.stack),
+                OpCode::SWAP3 => swap::<3>(&mut state.stack),
+                OpCode::SWAP4 => swap::<4>(&mut state.stack),
+                OpCode::SWAP5 => swap::<5>(&mut state.stack),
+                OpCode::SWAP6 => swap::<6>(&mut state.stack),
+                OpCode::SWAP7 => swap::<7>(&mut state.stack),
+                OpCode::SWAP8 => swap::<8>(&mut state.stack),
+                OpCode::SWAP9 => swap::<9>(&mut state.stack),
+                OpCode::SWAP10 => swap::<10>(&mut state.stack),
+                OpCode::SWAP11 => swap::<11>(&mut state.stack),
+                OpCode::SWAP12 => swap::<12>(&mut state.stack),
+                OpCode::SWAP13 => swap::<13>(&mut state.stack),
+                OpCode::SWAP14 => swap::<14>(&mut state.stack),
+                OpCode::SWAP15 => swap::<15>(&mut state.stack),
+                OpCode::SWAP16 => swap::<16>(&mut state.stack),
 
                 OpCode::LOG0 | OpCode::LOG1 | OpCode::LOG2 | OpCode::LOG3 | OpCode::LOG4 => {
-                    do_log!(&mut state, op.to_usize() - OpCode::LOG0.to_usize());
+                    do_log!(&mut state, op.0 - OpCode::LOG0.0);
                 }
                 OpCode::CREATE | OpCode::CREATE2 => {
                     do_create!(&mut state, op == OpCode::CREATE2);

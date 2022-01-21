@@ -4,7 +4,7 @@ pub(crate) mod boolean;
 pub(crate) mod call;
 pub(crate) mod control;
 pub(crate) mod external;
-pub(crate) mod instruction_table;
+pub mod instruction_table;
 pub(crate) mod memory;
 pub(crate) mod properties;
 pub(crate) mod stack_manip;

@@ -1,6 +1,7 @@
 use std::{borrow::Cow, fmt::Display};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(transparent)]
 pub struct OpCode(pub u8);
 
 impl OpCode {
@@ -320,6 +321,8 @@ impl OpCode {
         }
     }
 
+    #[cfg(feature = "util")]
+    #[inline(always)]
     pub fn push_size(self) -> Option<u8> {
         (self.to_u8() >= OpCode::PUSH1.to_u8() && self.to_u8() <= OpCode::PUSH32.to_u8())
             .then(|| self.to_u8() - OpCode::PUSH1.to_u8() + 1)
