@@ -10,8 +10,9 @@ use derive_more::From;
 use enum_as_inner::EnumAsInner;
 use ethereum_types::Address;
 use ethnum::U256;
-use std::ops::GeneratorState;
-use std::{convert::Infallible, ops::Generator, pin::Pin};
+use next_gen::generator::Generator;
+use next_gen::generator::GeneratorState;
+use std::{convert::Infallible, pin::Pin};
 
 mod sealed {
     pub trait Sealed {}
@@ -44,7 +45,6 @@ type InnerCoroutine = Pin<
                 Yield = InterruptDataVariant,
                 Return = Result<SuccessfulOutput, StatusCode>,
             > + Send
-            + Sync
             + Unpin,
     >,
 >;
@@ -80,6 +80,6 @@ fn resume_interrupt(mut inner: InnerCoroutine, resume_data: ResumeDataVariant) -
                 AccessStorageInterrupt { inner, data }.into()
             }
         },
-        GeneratorState::Complete(res) => InterruptVariant::Complete(res),
+        GeneratorState::Returned(res) => InterruptVariant::Complete(res),
     }
 }

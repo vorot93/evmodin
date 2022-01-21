@@ -244,7 +244,9 @@ macro_rules! extcodecopy {
 
         if $state.evm_revision >= Revision::Berlin
             && ResumeDataVariant::into_access_account_status({
-                yield InterruptDataVariant::AccessAccount(AccessAccount { address: addr })
+                yield_!(InterruptDataVariant::AccessAccount(AccessAccount {
+                    address: addr
+                }))
             })
             .unwrap()
             .status
@@ -260,11 +262,11 @@ macro_rules! extcodecopy {
             let src = min(U256::from(MAX_BUFFER_SIZE), input_index).as_usize();
 
             let code = ResumeDataVariant::into_code({
-                yield InterruptDataVariant::CopyCode(CopyCode {
+                yield_!(InterruptDataVariant::CopyCode(CopyCode {
                     address: addr,
                     offset: src,
                     max_size: region.size.get(),
-                })
+                }))
             })
             .unwrap()
             .code;
@@ -329,7 +331,9 @@ macro_rules! extcodehash {
 
         if $state.evm_revision >= Revision::Berlin
             && ResumeDataVariant::into_access_account_status({
-                yield InterruptDataVariant::AccessAccount(AccessAccount { address: addr })
+                yield_!(InterruptDataVariant::AccessAccount(AccessAccount {
+                    address: addr
+                }))
             })
             .unwrap()
             .status
@@ -342,7 +346,9 @@ macro_rules! extcodehash {
         }
 
         let code_hash = ResumeDataVariant::into_code_hash({
-            yield InterruptDataVariant::GetCodeHash(GetCodeHash { address: addr })
+            yield_!(InterruptDataVariant::GetCodeHash(GetCodeHash {
+                address: addr
+            }))
         })
         .unwrap()
         .hash;

@@ -6,11 +6,10 @@ macro_rules! interrupt {
         pub struct $name {
             pub(crate) inner: ::core::pin::Pin<
                 Box<
-                    dyn ::core::ops::Generator<ResumeDataVariant,
+                    dyn ::next_gen::generator::Generator<ResumeDataVariant,
                             Yield = InterruptDataVariant,
                             Return = Result<SuccessfulOutput, StatusCode>,
                         > + Send
-                        + Sync
                         + Unpin,
                 >,
             >,

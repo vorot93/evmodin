@@ -7,8 +7,9 @@ use crate::{
     tracing::Tracer,
     *,
 };
+use ::next_gen::prelude::*;
 use ethnum::U256;
-use std::{ops::Generator, sync::Arc};
+use std::sync::Arc;
 
 fn check_requirements(
     instruction_table: &InstructionTable,
@@ -150,7 +151,7 @@ impl AnalyzedCode {
         revision: Revision,
     ) -> ExecutionStartInterrupt {
         let code = self.clone();
-        let inner = Box::pin(interpreter_producer(
+        mk_gen!(let inner = box interpreter_producer(
             code,
             ExecutionState::new(message, revision),
             trace,
@@ -272,362 +273,359 @@ impl ExecutionStartInterrupt {
     }
 }
 
+#[generator(yield(InterruptDataVariant), resume(ResumeDataVariant))]
 fn interpreter_producer(
     s: AnalyzedCode,
     mut state: ExecutionState,
     trace: bool,
-) -> impl Generator<
-    ResumeDataVariant,
-    Yield = InterruptDataVariant,
-    Return = Result<SuccessfulOutput, StatusCode>,
-> {
-    move |_: ResumeDataVariant| {
-        let instruction_table = get_baseline_instruction_table(state.evm_revision);
+) -> Result<SuccessfulOutput, StatusCode> {
+    let instruction_table = get_baseline_instruction_table(state.evm_revision);
 
-        let mut reverted = false;
+    let mut reverted = false;
 
-        let mut pc = 0;
+    let mut pc = 0;
 
-        loop {
-            let op = OpCode(s.padded_code[pc]);
+    loop {
+        let op = OpCode(s.padded_code[pc]);
 
-            // Do not print stop on the final STOP
-            if trace && pc < s.code.len() {
-                if let Some(modifier) = {
-                    yield InterruptDataVariant::InstructionStart(Box::new(InstructionStart {
+        // Do not print stop on the final STOP
+        if trace && pc < s.code.len() {
+            if let Some(modifier) = {
+                yield_!(InterruptDataVariant::InstructionStart(Box::new(
+                    InstructionStart {
                         pc,
                         opcode: op,
                         state: state.clone(),
-                    }))
-                }
-                .as_state_modifier()
-                .unwrap()
-                {
-                    (modifier)(&mut state)
-                }
-            }
-
-            check_requirements(instruction_table, &mut state, op)?;
-
-            match op {
-                OpCode::STOP => {
-                    break;
-                }
-                OpCode::ADD => {
-                    arithmetic::add(&mut state.stack);
-                }
-                OpCode::MUL => {
-                    arithmetic::mul(&mut state.stack);
-                }
-                OpCode::SUB => {
-                    arithmetic::sub(&mut state.stack);
-                }
-                OpCode::DIV => {
-                    arithmetic::div(&mut state.stack);
-                }
-                OpCode::SDIV => {
-                    arithmetic::sdiv(&mut state.stack);
-                }
-                OpCode::MOD => {
-                    arithmetic::modulo(&mut state.stack);
-                }
-                OpCode::SMOD => {
-                    arithmetic::smod(&mut state.stack);
-                }
-                OpCode::ADDMOD => {
-                    arithmetic::addmod(&mut state.stack);
-                }
-                OpCode::MULMOD => {
-                    arithmetic::mulmod(&mut state.stack);
-                }
-                OpCode::EXP => {
-                    arithmetic::exp(&mut state)?;
-                }
-                OpCode::SIGNEXTEND => {
-                    arithmetic::signextend(&mut state.stack);
-                }
-                OpCode::LT => {
-                    boolean::lt(&mut state.stack);
-                }
-                OpCode::GT => {
-                    boolean::gt(&mut state.stack);
-                }
-                OpCode::SLT => {
-                    boolean::slt(&mut state.stack);
-                }
-                OpCode::SGT => {
-                    boolean::sgt(&mut state.stack);
-                }
-                OpCode::EQ => {
-                    boolean::eq(&mut state.stack);
-                }
-                OpCode::ISZERO => {
-                    boolean::iszero(&mut state.stack);
-                }
-                OpCode::AND => {
-                    boolean::and(&mut state.stack);
-                }
-                OpCode::OR => {
-                    boolean::or(&mut state.stack);
-                }
-                OpCode::XOR => {
-                    boolean::xor(&mut state.stack);
-                }
-                OpCode::NOT => {
-                    boolean::not(&mut state.stack);
-                }
-                OpCode::BYTE => {
-                    bitwise::byte(&mut state.stack);
-                }
-                OpCode::SHL => {
-                    bitwise::shl(&mut state.stack);
-                }
-                OpCode::SHR => {
-                    bitwise::shr(&mut state.stack);
-                }
-                OpCode::SAR => {
-                    bitwise::sar(&mut state.stack);
-                }
-
-                OpCode::KECCAK256 => {
-                    memory::keccak256(&mut state)?;
-                }
-                OpCode::ADDRESS => {
-                    external::address(&mut state);
-                }
-                OpCode::BALANCE => {
-                    balance!(&mut state);
-                }
-                OpCode::CALLER => {
-                    external::caller(&mut state);
-                }
-                OpCode::CALLVALUE => {
-                    external::callvalue(&mut state);
-                }
-                OpCode::CALLDATALOAD => {
-                    calldataload(&mut state);
-                }
-                OpCode::CALLDATASIZE => {
-                    calldatasize(&mut state);
-                }
-                OpCode::CALLDATACOPY => {
-                    memory::calldatacopy(&mut state)?;
-                }
-                OpCode::CODESIZE => {
-                    memory::codesize(&mut state.stack, &s.code[..]);
-                }
-                OpCode::CODECOPY => {
-                    memory::codecopy(&mut state, &s.code[..])?;
-                }
-                OpCode::EXTCODESIZE => {
-                    extcodesize!(&mut state);
-                }
-                OpCode::EXTCODECOPY => {
-                    extcodecopy!(state);
-                }
-                OpCode::RETURNDATASIZE => {
-                    memory::returndatasize(&mut state);
-                }
-                OpCode::RETURNDATACOPY => {
-                    memory::returndatacopy(&mut state)?;
-                }
-                OpCode::EXTCODEHASH => {
-                    extcodehash!(state);
-                }
-                OpCode::BLOCKHASH => {
-                    blockhash!(state);
-                }
-                OpCode::ORIGIN
-                | OpCode::COINBASE
-                | OpCode::GASPRICE
-                | OpCode::TIMESTAMP
-                | OpCode::NUMBER
-                | OpCode::DIFFICULTY
-                | OpCode::GASLIMIT
-                | OpCode::CHAINID
-                | OpCode::BASEFEE => {
-                    push_txcontext!(
-                        state,
-                        match op {
-                            OpCode::ORIGIN => external::origin_accessor,
-                            OpCode::COINBASE => external::coinbase_accessor,
-                            OpCode::GASPRICE => external::gasprice_accessor,
-                            OpCode::TIMESTAMP => external::timestamp_accessor,
-                            OpCode::NUMBER => external::number_accessor,
-                            OpCode::DIFFICULTY => external::difficulty_accessor,
-                            OpCode::GASLIMIT => external::gaslimit_accessor,
-                            OpCode::CHAINID => external::chainid_accessor,
-                            OpCode::BASEFEE => external::basefee_accessor,
-                            _ => unreachable!(),
-                        }
-                    );
-                }
-                OpCode::SELFBALANCE => {
-                    selfbalance!(state);
-                }
-                OpCode::POP => {
-                    stack_manip::pop(&mut state.stack);
-                }
-                OpCode::MLOAD => {
-                    memory::mload(&mut state)?;
-                }
-                OpCode::MSTORE => {
-                    memory::mstore(&mut state)?;
-                }
-                OpCode::MSTORE8 => {
-                    memory::mstore8(&mut state)?;
-                }
-                OpCode::JUMP => {
-                    pc = op_jump(&mut state, &s.jumpdest_map)?;
-
-                    continue;
-                }
-                OpCode::JUMPI => {
-                    if *state.stack.get(1) != 0 {
-                        pc = op_jump(&mut state, &s.jumpdest_map)?;
-                        state.stack.pop();
-
-                        continue;
-                    } else {
-                        state.stack.pop();
-                        state.stack.pop();
                     }
-                }
-                OpCode::PC => state.stack.push(u128::try_from(pc).unwrap().into()),
-                OpCode::MSIZE => memory::msize(&mut state),
-                OpCode::SLOAD => {
-                    sload!(state);
-                }
-                OpCode::SSTORE => {
-                    sstore!(state);
-                }
-                OpCode::GAS => state
-                    .stack
-                    .push(u128::try_from(state.gas_left).unwrap().into()),
-                OpCode::JUMPDEST => {}
-                OpCode::PUSH1
-                | OpCode::PUSH2
-                | OpCode::PUSH3
-                | OpCode::PUSH4
-                | OpCode::PUSH5
-                | OpCode::PUSH6
-                | OpCode::PUSH7
-                | OpCode::PUSH8
-                | OpCode::PUSH9
-                | OpCode::PUSH10
-                | OpCode::PUSH11
-                | OpCode::PUSH12
-                | OpCode::PUSH13
-                | OpCode::PUSH14
-                | OpCode::PUSH15
-                | OpCode::PUSH16
-                | OpCode::PUSH17
-                | OpCode::PUSH18
-                | OpCode::PUSH19
-                | OpCode::PUSH20
-                | OpCode::PUSH21
-                | OpCode::PUSH22
-                | OpCode::PUSH23
-                | OpCode::PUSH24
-                | OpCode::PUSH25
-                | OpCode::PUSH26
-                | OpCode::PUSH27
-                | OpCode::PUSH28
-                | OpCode::PUSH29
-                | OpCode::PUSH30
-                | OpCode::PUSH31
-                | OpCode::PUSH32 => {
-                    let push_len = op.push_size().unwrap().into();
-                    push(&mut state.stack, &s.padded_code[pc + 1..], push_len);
-                    pc += push_len;
-                }
-
-                OpCode::DUP1
-                | OpCode::DUP2
-                | OpCode::DUP3
-                | OpCode::DUP4
-                | OpCode::DUP5
-                | OpCode::DUP6
-                | OpCode::DUP7
-                | OpCode::DUP8
-                | OpCode::DUP9
-                | OpCode::DUP10
-                | OpCode::DUP11
-                | OpCode::DUP12
-                | OpCode::DUP13
-                | OpCode::DUP14
-                | OpCode::DUP15
-                | OpCode::DUP16 => {
-                    dup(
-                        &mut state.stack,
-                        op.to_usize() - OpCode::DUP1.to_usize() + 1,
-                    );
-                }
-
-                OpCode::SWAP1
-                | OpCode::SWAP2
-                | OpCode::SWAP3
-                | OpCode::SWAP4
-                | OpCode::SWAP5
-                | OpCode::SWAP6
-                | OpCode::SWAP7
-                | OpCode::SWAP8
-                | OpCode::SWAP9
-                | OpCode::SWAP10
-                | OpCode::SWAP11
-                | OpCode::SWAP12
-                | OpCode::SWAP13
-                | OpCode::SWAP14
-                | OpCode::SWAP15
-                | OpCode::SWAP16 => swap(
-                    &mut state.stack,
-                    op.to_usize() - OpCode::SWAP1.to_usize() + 1,
-                ),
-
-                OpCode::LOG0 | OpCode::LOG1 | OpCode::LOG2 | OpCode::LOG3 | OpCode::LOG4 => {
-                    do_log!(&mut state, op.to_usize() - OpCode::LOG0.to_usize());
-                }
-                OpCode::CREATE | OpCode::CREATE2 => {
-                    do_create!(&mut state, op == OpCode::CREATE2);
-                }
-                OpCode::CALL | OpCode::CALLCODE | OpCode::DELEGATECALL | OpCode::STATICCALL => {
-                    do_call!(
-                        &mut state,
-                        match op {
-                            OpCode::CALL | OpCode::STATICCALL => CallKind::Call,
-                            OpCode::CALLCODE => CallKind::CallCode,
-                            OpCode::DELEGATECALL => CallKind::DelegateCall,
-                            _ => unreachable!(),
-                        },
-                        op == OpCode::STATICCALL
-                    );
-                }
-                OpCode::RETURN | OpCode::REVERT => {
-                    ret(&mut state)?;
-                    reverted = op == OpCode::REVERT;
-                    break;
-                }
-                OpCode::INVALID => {
-                    return Err(StatusCode::InvalidInstruction);
-                }
-                OpCode::SELFDESTRUCT => {
-                    selfdestruct!(state);
-                    break;
-                }
-                other => {
-                    unreachable!("reached unhandled opcode: {}", other);
-                }
+                )))
             }
-
-            pc += 1;
+            .as_state_modifier()
+            .unwrap()
+            {
+                (modifier)(&mut state)
+            }
         }
 
-        let output = SuccessfulOutput {
-            reverted,
-            gas_left: state.gas_left,
-            output_data: state.output_data.clone(),
-        };
+        check_requirements(instruction_table, &mut state, op)?;
 
-        Ok(output)
+        match op {
+            OpCode::STOP => {
+                break;
+            }
+            OpCode::ADD => {
+                arithmetic::add(&mut state.stack);
+            }
+            OpCode::MUL => {
+                arithmetic::mul(&mut state.stack);
+            }
+            OpCode::SUB => {
+                arithmetic::sub(&mut state.stack);
+            }
+            OpCode::DIV => {
+                arithmetic::div(&mut state.stack);
+            }
+            OpCode::SDIV => {
+                arithmetic::sdiv(&mut state.stack);
+            }
+            OpCode::MOD => {
+                arithmetic::modulo(&mut state.stack);
+            }
+            OpCode::SMOD => {
+                arithmetic::smod(&mut state.stack);
+            }
+            OpCode::ADDMOD => {
+                arithmetic::addmod(&mut state.stack);
+            }
+            OpCode::MULMOD => {
+                arithmetic::mulmod(&mut state.stack);
+            }
+            OpCode::EXP => {
+                arithmetic::exp(&mut state)?;
+            }
+            OpCode::SIGNEXTEND => {
+                arithmetic::signextend(&mut state.stack);
+            }
+            OpCode::LT => {
+                boolean::lt(&mut state.stack);
+            }
+            OpCode::GT => {
+                boolean::gt(&mut state.stack);
+            }
+            OpCode::SLT => {
+                boolean::slt(&mut state.stack);
+            }
+            OpCode::SGT => {
+                boolean::sgt(&mut state.stack);
+            }
+            OpCode::EQ => {
+                boolean::eq(&mut state.stack);
+            }
+            OpCode::ISZERO => {
+                boolean::iszero(&mut state.stack);
+            }
+            OpCode::AND => {
+                boolean::and(&mut state.stack);
+            }
+            OpCode::OR => {
+                boolean::or(&mut state.stack);
+            }
+            OpCode::XOR => {
+                boolean::xor(&mut state.stack);
+            }
+            OpCode::NOT => {
+                boolean::not(&mut state.stack);
+            }
+            OpCode::BYTE => {
+                bitwise::byte(&mut state.stack);
+            }
+            OpCode::SHL => {
+                bitwise::shl(&mut state.stack);
+            }
+            OpCode::SHR => {
+                bitwise::shr(&mut state.stack);
+            }
+            OpCode::SAR => {
+                bitwise::sar(&mut state.stack);
+            }
+
+            OpCode::KECCAK256 => {
+                memory::keccak256(&mut state)?;
+            }
+            OpCode::ADDRESS => {
+                external::address(&mut state);
+            }
+            OpCode::BALANCE => {
+                balance!(&mut state);
+            }
+            OpCode::CALLER => {
+                external::caller(&mut state);
+            }
+            OpCode::CALLVALUE => {
+                external::callvalue(&mut state);
+            }
+            OpCode::CALLDATALOAD => {
+                calldataload(&mut state);
+            }
+            OpCode::CALLDATASIZE => {
+                calldatasize(&mut state);
+            }
+            OpCode::CALLDATACOPY => {
+                memory::calldatacopy(&mut state)?;
+            }
+            OpCode::CODESIZE => {
+                memory::codesize(&mut state.stack, &s.code[..]);
+            }
+            OpCode::CODECOPY => {
+                memory::codecopy(&mut state, &s.code[..])?;
+            }
+            OpCode::EXTCODESIZE => {
+                extcodesize!(&mut state);
+            }
+            OpCode::EXTCODECOPY => {
+                extcodecopy!(state);
+            }
+            OpCode::RETURNDATASIZE => {
+                memory::returndatasize(&mut state);
+            }
+            OpCode::RETURNDATACOPY => {
+                memory::returndatacopy(&mut state)?;
+            }
+            OpCode::EXTCODEHASH => {
+                extcodehash!(state);
+            }
+            OpCode::BLOCKHASH => {
+                blockhash!(state);
+            }
+            OpCode::ORIGIN
+            | OpCode::COINBASE
+            | OpCode::GASPRICE
+            | OpCode::TIMESTAMP
+            | OpCode::NUMBER
+            | OpCode::DIFFICULTY
+            | OpCode::GASLIMIT
+            | OpCode::CHAINID
+            | OpCode::BASEFEE => {
+                push_txcontext!(
+                    state,
+                    match op {
+                        OpCode::ORIGIN => external::origin_accessor,
+                        OpCode::COINBASE => external::coinbase_accessor,
+                        OpCode::GASPRICE => external::gasprice_accessor,
+                        OpCode::TIMESTAMP => external::timestamp_accessor,
+                        OpCode::NUMBER => external::number_accessor,
+                        OpCode::DIFFICULTY => external::difficulty_accessor,
+                        OpCode::GASLIMIT => external::gaslimit_accessor,
+                        OpCode::CHAINID => external::chainid_accessor,
+                        OpCode::BASEFEE => external::basefee_accessor,
+                        _ => unreachable!(),
+                    }
+                );
+            }
+            OpCode::SELFBALANCE => {
+                selfbalance!(state);
+            }
+            OpCode::POP => {
+                stack_manip::pop(&mut state.stack);
+            }
+            OpCode::MLOAD => {
+                memory::mload(&mut state)?;
+            }
+            OpCode::MSTORE => {
+                memory::mstore(&mut state)?;
+            }
+            OpCode::MSTORE8 => {
+                memory::mstore8(&mut state)?;
+            }
+            OpCode::JUMP => {
+                pc = op_jump(&mut state, &s.jumpdest_map)?;
+
+                continue;
+            }
+            OpCode::JUMPI => {
+                if *state.stack.get(1) != 0 {
+                    pc = op_jump(&mut state, &s.jumpdest_map)?;
+                    state.stack.pop();
+
+                    continue;
+                } else {
+                    state.stack.pop();
+                    state.stack.pop();
+                }
+            }
+            OpCode::PC => state.stack.push(u128::try_from(pc).unwrap().into()),
+            OpCode::MSIZE => memory::msize(&mut state),
+            OpCode::SLOAD => {
+                sload!(state);
+            }
+            OpCode::SSTORE => {
+                sstore!(state);
+            }
+            OpCode::GAS => state
+                .stack
+                .push(u128::try_from(state.gas_left).unwrap().into()),
+            OpCode::JUMPDEST => {}
+            OpCode::PUSH1
+            | OpCode::PUSH2
+            | OpCode::PUSH3
+            | OpCode::PUSH4
+            | OpCode::PUSH5
+            | OpCode::PUSH6
+            | OpCode::PUSH7
+            | OpCode::PUSH8
+            | OpCode::PUSH9
+            | OpCode::PUSH10
+            | OpCode::PUSH11
+            | OpCode::PUSH12
+            | OpCode::PUSH13
+            | OpCode::PUSH14
+            | OpCode::PUSH15
+            | OpCode::PUSH16
+            | OpCode::PUSH17
+            | OpCode::PUSH18
+            | OpCode::PUSH19
+            | OpCode::PUSH20
+            | OpCode::PUSH21
+            | OpCode::PUSH22
+            | OpCode::PUSH23
+            | OpCode::PUSH24
+            | OpCode::PUSH25
+            | OpCode::PUSH26
+            | OpCode::PUSH27
+            | OpCode::PUSH28
+            | OpCode::PUSH29
+            | OpCode::PUSH30
+            | OpCode::PUSH31
+            | OpCode::PUSH32 => {
+                let push_len = op.push_size().unwrap().into();
+                push(&mut state.stack, &s.padded_code[pc + 1..], push_len);
+                pc += push_len;
+            }
+
+            OpCode::DUP1
+            | OpCode::DUP2
+            | OpCode::DUP3
+            | OpCode::DUP4
+            | OpCode::DUP5
+            | OpCode::DUP6
+            | OpCode::DUP7
+            | OpCode::DUP8
+            | OpCode::DUP9
+            | OpCode::DUP10
+            | OpCode::DUP11
+            | OpCode::DUP12
+            | OpCode::DUP13
+            | OpCode::DUP14
+            | OpCode::DUP15
+            | OpCode::DUP16 => {
+                dup(
+                    &mut state.stack,
+                    op.to_usize() - OpCode::DUP1.to_usize() + 1,
+                );
+            }
+
+            OpCode::SWAP1
+            | OpCode::SWAP2
+            | OpCode::SWAP3
+            | OpCode::SWAP4
+            | OpCode::SWAP5
+            | OpCode::SWAP6
+            | OpCode::SWAP7
+            | OpCode::SWAP8
+            | OpCode::SWAP9
+            | OpCode::SWAP10
+            | OpCode::SWAP11
+            | OpCode::SWAP12
+            | OpCode::SWAP13
+            | OpCode::SWAP14
+            | OpCode::SWAP15
+            | OpCode::SWAP16 => swap(
+                &mut state.stack,
+                op.to_usize() - OpCode::SWAP1.to_usize() + 1,
+            ),
+
+            OpCode::LOG0 | OpCode::LOG1 | OpCode::LOG2 | OpCode::LOG3 | OpCode::LOG4 => {
+                do_log!(&mut state, op.to_usize() - OpCode::LOG0.to_usize());
+            }
+            OpCode::CREATE | OpCode::CREATE2 => {
+                do_create!(&mut state, op == OpCode::CREATE2);
+            }
+            OpCode::CALL | OpCode::CALLCODE | OpCode::DELEGATECALL | OpCode::STATICCALL => {
+                do_call!(
+                    &mut state,
+                    match op {
+                        OpCode::CALL | OpCode::STATICCALL => CallKind::Call,
+                        OpCode::CALLCODE => CallKind::CallCode,
+                        OpCode::DELEGATECALL => CallKind::DelegateCall,
+                        _ => unreachable!(),
+                    },
+                    op == OpCode::STATICCALL
+                );
+            }
+            OpCode::RETURN | OpCode::REVERT => {
+                ret(&mut state)?;
+                reverted = op == OpCode::REVERT;
+                break;
+            }
+            OpCode::INVALID => {
+                return Err(StatusCode::InvalidInstruction);
+            }
+            OpCode::SELFDESTRUCT => {
+                selfdestruct!(state);
+                break;
+            }
+            other => {
+                unreachable!("reached unhandled opcode: {}", other);
+            }
+        }
+
+        pc += 1;
     }
+
+    let output = SuccessfulOutput {
+        reverted,
+        gas_left: state.gas_left,
+        output_data: state.output_data.clone(),
+    };
+
+    Ok(output)
 }
