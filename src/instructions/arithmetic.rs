@@ -119,16 +119,17 @@ fn log2floor(value: U256) -> u64 {
     l
 }
 
-pub(crate) fn exp(state: &mut ExecutionState) -> Result<(), StatusCode> {
+pub(crate) fn exp<const REVISION: Revision>(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let mut base = state.stack.pop();
     let mut power = state.stack.pop();
 
     if power > 0 {
-        let additional_gas = if state.evm_revision >= Revision::Spurious {
+        let factor = if REVISION >= Revision::Spurious {
             50
         } else {
             10
-        } * (log2floor(power) / 8 + 1);
+        };
+        let additional_gas = factor * (log2floor(power) / 8 + 1);
 
         state.gas_left -= additional_gas as i64;
 

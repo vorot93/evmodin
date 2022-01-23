@@ -16,7 +16,7 @@ pub(crate) fn callvalue(state: &mut ExecutionState) {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! balance {
-    ($state:expr) => {
+    ($state:expr,$rev:expr) => {
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -26,7 +26,7 @@ macro_rules! balance {
 
         let address = u256_to_address($state.stack.pop());
 
-        if $state.evm_revision >= Revision::Berlin {
+        if $rev >= Revision::Berlin {
             let access_status = ResumeDataVariant::into_access_account_status({
                 yield InterruptDataVariant::AccessAccount(AccessAccount { address })
             })
@@ -53,7 +53,7 @@ macro_rules! balance {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! extcodesize {
-    ($state:expr) => {
+    ($state:expr,$rev:expr) => {
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -63,7 +63,7 @@ macro_rules! extcodesize {
 
         let address = u256_to_address($state.stack.pop());
 
-        if $state.evm_revision >= Revision::Berlin {
+        if $rev >= Revision::Berlin {
             let access_account = ResumeDataVariant::into_access_account_status({
                 yield InterruptDataVariant::AccessAccount(AccessAccount { address })
             })
@@ -238,7 +238,7 @@ macro_rules! do_log {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! sload {
-    ($state:expr) => {{
+    ($state:expr,$rev:expr) => {{
         use $crate::{
             continuation::{interrupt_data::*, resume_data::*},
             host::*,
@@ -247,7 +247,7 @@ macro_rules! sload {
 
         let key = $state.stack.pop();
 
-        if $state.evm_revision >= Revision::Berlin {
+        if $rev >= Revision::Berlin {
             let access_status = ResumeDataVariant::into_access_storage_status({
                 yield InterruptDataVariant::AccessStorage(AccessStorage {
                     address: $state.message.recipient,
@@ -283,7 +283,7 @@ macro_rules! sload {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! sstore {
-    ($state:expr) => {{
+    ($state:expr,$rev:expr) => {{
         use $crate::{
             continuation::{interrupt_data::*, resume_data::*},
             host::*,
@@ -294,15 +294,17 @@ macro_rules! sstore {
             return Err(StatusCode::StaticModeViolation);
         }
 
-        if $state.evm_revision >= Revision::Istanbul && $state.gas_left <= 2300 {
-            return Err(StatusCode::OutOfGas);
+        if $rev >= Revision::Istanbul {
+            if $state.gas_left <= 2300 {
+                return Err(StatusCode::OutOfGas);
+            }
         }
 
         let key = $state.stack.pop();
         let value = $state.stack.pop();
 
         let mut cost = 0;
-        if $state.evm_revision >= Revision::Berlin {
+        if $rev >= Revision::Berlin {
             let access_status = ResumeDataVariant::into_access_storage_status({
                 yield InterruptDataVariant::AccessStorage(AccessStorage {
                     address: $state.message.recipient,
@@ -329,18 +331,18 @@ macro_rules! sstore {
 
         cost = match status {
             StorageStatus::Unchanged | StorageStatus::ModifiedAgain => {
-                if $state.evm_revision >= Revision::Berlin {
+                if $rev >= Revision::Berlin {
                     cost + WARM_STORAGE_READ_COST
-                } else if $state.evm_revision == Revision::Istanbul {
+                } else if $rev == Revision::Istanbul {
                     800
-                } else if $state.evm_revision == Revision::Constantinople {
+                } else if $rev == Revision::Constantinople {
                     200
                 } else {
                     5000
                 }
             }
             StorageStatus::Modified | StorageStatus::Deleted => {
-                if $state.evm_revision >= Revision::Berlin {
+                if $rev >= Revision::Berlin {
                     cost + 5000 - COLD_SLOAD_COST
                 } else {
                     5000
@@ -358,7 +360,7 @@ macro_rules! sstore {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! selfdestruct {
-    ($state:expr) => {{
+    ($state:expr,$rev:expr) => {{
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -372,7 +374,7 @@ macro_rules! selfdestruct {
 
         let beneficiary = u256_to_address($state.stack.pop());
 
-        if $state.evm_revision >= Revision::Berlin {
+        if $rev >= Revision::Berlin {
             let access_status = ResumeDataVariant::into_access_account_status({
                 yield InterruptDataVariant::AccessAccount(AccessAccount {
                     address: beneficiary,
@@ -388,8 +390,8 @@ macro_rules! selfdestruct {
             }
         }
 
-        if $state.evm_revision >= Revision::Tangerine
-            && ($state.evm_revision == Revision::Tangerine
+        if $rev >= Revision::Tangerine {
+            if ($rev == Revision::Tangerine
                 || !{
                     ResumeDataVariant::into_balance({
                         yield InterruptDataVariant::GetBalance(GetBalance {
@@ -400,20 +402,21 @@ macro_rules! selfdestruct {
                     .balance
                         == 0
                 })
-        {
-            // After TANGERINE_WHISTLE apply additional cost of
-            // sending value to a non-existing account.
-            if !ResumeDataVariant::into_account_exists_status({
-                yield InterruptDataVariant::AccountExists(AccountExists {
-                    address: beneficiary,
-                })
-            })
-            .unwrap()
-            .exists
             {
-                $state.gas_left -= 25000;
-                if $state.gas_left < 0 {
-                    return Err(StatusCode::OutOfGas);
+                // After TANGERINE_WHISTLE apply additional cost of
+                // sending value to a non-existing account.
+                if !ResumeDataVariant::into_account_exists_status({
+                    yield InterruptDataVariant::AccountExists(AccountExists {
+                        address: beneficiary,
+                    })
+                })
+                .unwrap()
+                .exists
+                {
+                    $state.gas_left -= 25000;
+                    if $state.gas_left < 0 {
+                        return Err(StatusCode::OutOfGas);
+                    }
                 }
             }
         }

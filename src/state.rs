@@ -1,4 +1,4 @@
-use crate::common::{Message, Revision};
+use crate::common::Message;
 use arrayvec::ArrayVec;
 use bytes::{Bytes, BytesMut};
 use derive_more::{Deref, DerefMut};
@@ -100,20 +100,18 @@ pub struct ExecutionState {
     #[getset(get = "pub", get_mut = "pub")]
     pub(crate) memory: Memory,
     pub(crate) message: Message,
-    pub(crate) evm_revision: Revision,
     #[getset(get = "pub", get_mut = "pub")]
     pub(crate) return_data: Bytes,
     pub(crate) output_data: Bytes,
 }
 
 impl ExecutionState {
-    pub fn new(message: Message, evm_revision: Revision) -> Self {
+    pub fn new(message: Message) -> Self {
         Self {
             gas_left: message.gas,
             stack: Stack::default(),
             memory: Memory::new(),
             message,
-            evm_revision,
             return_data: Default::default(),
             output_data: Bytes::new(),
         }

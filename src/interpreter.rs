@@ -152,12 +152,38 @@ impl AnalyzedCode {
         revision: Revision,
     ) -> ExecutionStartInterrupt {
         let code = self.clone();
-        let state = ExecutionState::new(message, revision);
-        let inner: InnerCoroutine = if trace {
-            Box::new(interpreter_producer::<true>(code, state))
-        } else {
-            Box::new(interpreter_producer::<false>(code, state))
+        let state = ExecutionState::new(message);
+        let f = match (trace, revision) {
+            (true, Revision::Frontier) => interpreter_producer::<true, { Revision::Frontier }>,
+            (true, Revision::Homestead) => interpreter_producer::<true, { Revision::Homestead }>,
+            (true, Revision::Tangerine) => interpreter_producer::<true, { Revision::Tangerine }>,
+            (true, Revision::Spurious) => interpreter_producer::<true, { Revision::Spurious }>,
+            (true, Revision::Byzantium) => interpreter_producer::<true, { Revision::Byzantium }>,
+            (true, Revision::Constantinople) => {
+                interpreter_producer::<true, { Revision::Constantinople }>
+            }
+            (true, Revision::Petersburg) => interpreter_producer::<true, { Revision::Petersburg }>,
+            (true, Revision::Istanbul) => interpreter_producer::<true, { Revision::Istanbul }>,
+            (true, Revision::Berlin) => interpreter_producer::<true, { Revision::Berlin }>,
+            (true, Revision::London) => interpreter_producer::<true, { Revision::London }>,
+            (true, Revision::Shanghai) => interpreter_producer::<true, { Revision::Shanghai }>,
+            (false, Revision::Frontier) => interpreter_producer::<false, { Revision::Frontier }>,
+            (false, Revision::Homestead) => interpreter_producer::<false, { Revision::Homestead }>,
+            (false, Revision::Tangerine) => interpreter_producer::<false, { Revision::Tangerine }>,
+            (false, Revision::Spurious) => interpreter_producer::<false, { Revision::Spurious }>,
+            (false, Revision::Byzantium) => interpreter_producer::<false, { Revision::Byzantium }>,
+            (false, Revision::Constantinople) => {
+                interpreter_producer::<false, { Revision::Constantinople }>
+            }
+            (false, Revision::Petersburg) => {
+                interpreter_producer::<false, { Revision::Petersburg }>
+            }
+            (false, Revision::Istanbul) => interpreter_producer::<false, { Revision::Istanbul }>,
+            (false, Revision::Berlin) => interpreter_producer::<false, { Revision::Berlin }>,
+            (false, Revision::London) => interpreter_producer::<false, { Revision::London }>,
+            (false, Revision::Shanghai) => interpreter_producer::<false, { Revision::Shanghai }>,
         };
+        let inner = (f)(code, state);
 
         ExecutionStartInterrupt { inner, data: () }
     }
@@ -275,16 +301,20 @@ impl ExecutionStartInterrupt {
     }
 }
 
-fn interpreter_producer<const TRACE: bool>(
+fn interpreter_producer<const TRACE: bool, const REVISION: Revision>(
     s: AnalyzedCode,
     mut state: ExecutionState,
-) -> impl Generator<
-    ResumeDataVariant,
-    Yield = InterruptDataVariant,
-    Return = Result<SuccessfulOutput, StatusCode>,
+) -> Box<
+    dyn Generator<
+            ResumeDataVariant,
+            Yield = InterruptDataVariant,
+            Return = Result<SuccessfulOutput, StatusCode>,
+        > + Send
+        + Sync
+        + Unpin,
 > {
-    move |_: ResumeDataVariant| {
-        let instruction_table = get_baseline_instruction_table(state.evm_revision);
+    Box::new(move |_: ResumeDataVariant| {
+        let instruction_table = get_baseline_instruction_table(REVISION);
 
         let mut reverted = false;
 
@@ -345,7 +375,7 @@ fn interpreter_producer<const TRACE: bool>(
                     arithmetic::mulmod(&mut state.stack);
                 }
                 OpCode::EXP => {
-                    arithmetic::exp(&mut state)?;
+                    arithmetic::exp::<REVISION>(&mut state)?;
                 }
                 OpCode::SIGNEXTEND => {
                     arithmetic::signextend(&mut state.stack);
@@ -400,7 +430,7 @@ fn interpreter_producer<const TRACE: bool>(
                     external::address(&mut state);
                 }
                 OpCode::BALANCE => {
-                    balance!(&mut state);
+                    balance!(&mut state, REVISION);
                 }
                 OpCode::CALLER => {
                     external::caller(&mut state);
@@ -424,10 +454,10 @@ fn interpreter_producer<const TRACE: bool>(
                     memory::codecopy(&mut state, &s.code[..])?;
                 }
                 OpCode::EXTCODESIZE => {
-                    extcodesize!(&mut state);
+                    extcodesize!(&mut state, REVISION);
                 }
                 OpCode::EXTCODECOPY => {
-                    extcodecopy!(state);
+                    extcodecopy!(state, REVISION);
                 }
                 OpCode::RETURNDATASIZE => {
                     memory::returndatasize(&mut state);
@@ -436,7 +466,7 @@ fn interpreter_producer<const TRACE: bool>(
                     memory::returndatacopy(&mut state)?;
                 }
                 OpCode::EXTCODEHASH => {
-                    extcodehash!(state);
+                    extcodehash!(state, REVISION);
                 }
                 OpCode::BLOCKHASH => {
                     blockhash!(state);
@@ -492,10 +522,10 @@ fn interpreter_producer<const TRACE: bool>(
                 OpCode::PC => state.stack.push(u128::try_from(pc).unwrap().into()),
                 OpCode::MSIZE => memory::msize(&mut state),
                 OpCode::SLOAD => {
-                    sload!(state);
+                    sload!(state, REVISION);
                 }
                 OpCode::SSTORE => {
-                    sstore!(state);
+                    sstore!(state, REVISION);
                 }
                 OpCode::GAS => state
                     .stack
@@ -578,11 +608,12 @@ fn interpreter_producer<const TRACE: bool>(
                     do_log!(&mut state, op.0 - OpCode::LOG0.0);
                 }
                 OpCode::CREATE | OpCode::CREATE2 => {
-                    do_create!(&mut state, op == OpCode::CREATE2);
+                    do_create!(&mut state, REVISION, op == OpCode::CREATE2);
                 }
                 OpCode::CALL | OpCode::CALLCODE | OpCode::DELEGATECALL | OpCode::STATICCALL => {
                     do_call!(
                         &mut state,
+                        REVISION,
                         match op {
                             OpCode::CALL | OpCode::STATICCALL => CallKind::Call,
                             OpCode::CALLCODE => CallKind::CallCode,
@@ -601,7 +632,7 @@ fn interpreter_producer<const TRACE: bool>(
                     return Err(StatusCode::InvalidInstruction);
                 }
                 OpCode::SELFDESTRUCT => {
-                    selfdestruct!(state);
+                    selfdestruct!(state, REVISION);
                     break;
                 }
                 other => {
@@ -619,5 +650,5 @@ fn interpreter_producer<const TRACE: bool>(
         };
 
         Ok(output)
-    }
+    })
 }

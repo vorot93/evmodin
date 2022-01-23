@@ -227,7 +227,7 @@ pub(crate) fn codecopy(state: &mut ExecutionState, code: &[u8]) -> Result<(), St
 #[doc(hidden)]
 #[macro_export]
 macro_rules! extcodecopy {
-    ($state:expr) => {
+    ($state:expr,$rev:expr) => {
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -252,17 +252,18 @@ macro_rules! extcodecopy {
             }
         }
 
-        if $state.evm_revision >= Revision::Berlin
-            && ResumeDataVariant::into_access_account_status({
+        if $rev >= Revision::Berlin {
+            if ResumeDataVariant::into_access_account_status({
                 yield InterruptDataVariant::AccessAccount(AccessAccount { address: addr })
             })
             .unwrap()
             .status
                 == AccessStatus::Cold
-        {
-            $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
-            if $state.gas_left < 0 {
-                return Err(StatusCode::OutOfGas);
+            {
+                $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
+                if $state.gas_left < 0 {
+                    return Err(StatusCode::OutOfGas);
+                }
             }
         }
 
@@ -327,7 +328,7 @@ pub(crate) fn returndatacopy(state: &mut ExecutionState) -> Result<(), StatusCod
 #[doc(hidden)]
 #[macro_export]
 macro_rules! extcodehash {
-    ($state:expr) => {
+    ($state:expr,$rev:expr) => {
         use crate::{
             common::*,
             continuation::{interrupt_data::*, resume_data::*},
@@ -337,17 +338,18 @@ macro_rules! extcodehash {
 
         let addr = u256_to_address($state.stack.pop());
 
-        if $state.evm_revision >= Revision::Berlin
-            && ResumeDataVariant::into_access_account_status({
+        if $rev >= Revision::Berlin {
+            if ResumeDataVariant::into_access_account_status({
                 yield InterruptDataVariant::AccessAccount(AccessAccount { address: addr })
             })
             .unwrap()
             .status
                 == AccessStatus::Cold
-        {
-            $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
-            if $state.gas_left < 0 {
-                return Err(StatusCode::OutOfGas);
+            {
+                $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
+                if $state.gas_left < 0 {
+                    return Err(StatusCode::OutOfGas);
+                }
             }
         }
 

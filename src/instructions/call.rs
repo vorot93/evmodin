@@ -1,7 +1,7 @@
 #[doc(hidden)]
 #[macro_export]
 macro_rules! do_call {
-    ($state:expr, $kind:expr, $is_static:expr) => {{
+    ($state:expr, $rev:expr, $kind:expr, $is_static:expr) => {{
         use std::cmp::min;
         use $crate::{
             common::u256_to_address,
@@ -26,17 +26,18 @@ macro_rules! do_call {
 
         $state.stack.push(U256::ZERO); // Assume failure.
 
-        if $state.evm_revision >= Revision::Berlin
-            && ResumeDataVariant::into_access_account_status(
+        if $rev >= Revision::Berlin {
+            if ResumeDataVariant::into_access_account_status(
                 yield InterruptDataVariant::AccessAccount(AccessAccount { address: dst }),
             )
             .unwrap()
             .status
                 == AccessStatus::Cold
-        {
-            $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
-            if $state.gas_left < 0 {
-                return Err(StatusCode::OutOfGas);
+            {
+                $state.gas_left -= i64::from(ADDITIONAL_COLD_ACCOUNT_ACCESS_COST);
+                if $state.gas_left < 0 {
+                    return Err(StatusCode::OutOfGas);
+                }
             }
         }
 
@@ -80,7 +81,7 @@ macro_rules! do_call {
                 return Err(StatusCode::StaticModeViolation);
             }
 
-            if (has_value || $state.evm_revision < Revision::Spurious)
+            if (has_value || $rev < Revision::Spurious)
                 && !ResumeDataVariant::into_account_exists_status({
                     yield InterruptDataVariant::AccountExists(AccountExists { address: dst })
                 })
@@ -99,7 +100,7 @@ macro_rules! do_call {
             msg.gas = gas.as_usize() as i64;
         }
 
-        if $state.evm_revision >= Revision::Tangerine {
+        if $rev >= Revision::Tangerine {
             // TODO: Always true for STATICCALL.
             msg.gas = min(msg.gas, $state.gas_left - $state.gas_left / 64);
         } else if msg.gas > $state.gas_left {
@@ -154,7 +155,7 @@ macro_rules! do_call {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! do_create {
-    ($state:expr, $create2:expr) => {{
+    ($state:expr, $rev:expr, $create2:expr) => {{
         use ethnum::U256;
         use $crate::{
             common::*,
@@ -204,7 +205,7 @@ macro_rules! do_create {
                     < endowment)
         {
             let msg = CreateMessage {
-                gas: if $state.evm_revision >= Revision::Tangerine {
+                gas: if $rev >= Revision::Tangerine {
                     $state.gas_left - $state.gas_left / 64
                 } else {
                     $state.gas_left
