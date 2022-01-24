@@ -1,24 +1,18 @@
 use super::*;
 
 macro_rules! interrupt {
-    ( $(#[$outer:meta])* $name:ident, $data:ty => $resume_with:ty) => {
+    ( $(#[$outer:meta])* $name:ident => $resume_with:ty) => {
 		$(#[$outer])*
         pub struct $name {
             pub(crate) inner: InnerCoroutine,
-            pub(crate) data: $data,
         }
 
         impl sealed::Sealed for $name {}
 
         impl Interrupt for $name {
-            type InterruptData = $data;
             type ResumeData = $resume_with;
 
-            fn data(&self) -> &Self::InterruptData {
-                &self.data
-            }
-
-            fn resume(self, resume_data: $resume_with) -> InterruptVariant {
+            fn resume(self, resume_data: Self::ResumeData) -> InterruptVariant {
                 resume_interrupt(self.inner, resume_data.into())
             }
         }
@@ -27,102 +21,89 @@ macro_rules! interrupt {
 
 interrupt! {
     /// EVM has just been created. Resume this interrupt to start execution.
-    ExecutionStartInterrupt,
-    () => ()
+    ExecutionStartInterrupt => ()
 }
 interrupt! {
     /// New instruction has been encountered.
-    InstructionStartInterrupt,
-    Box<InstructionStart> => StateModifier
+    InstructionStartInterrupt => StateModifier
 }
 interrupt! {
     /// Does this account exist?
-    AccountExistsInterrupt,
-    AccountExists => AccountExistsStatus
+    AccountExistsInterrupt => AccountExistsStatus
 }
 interrupt! {
     /// Need this storage key.
-    GetStorageInterrupt,
-    GetStorage => StorageValue
+    GetStorageInterrupt => StorageValue
 }
 interrupt! {
     /// Set this storage key.
-    SetStorageInterrupt,
-    SetStorage => StorageStatusInfo
+    SetStorageInterrupt => StorageStatusInfo
 }
 interrupt! {
     /// Get balance of this account.
-    GetBalanceInterrupt,
-    GetBalance => Balance
+    GetBalanceInterrupt => Balance
 }
 interrupt! {
     /// Get code size of this account.
-    GetCodeSizeInterrupt,
-    GetCodeSize => CodeSize
+    GetCodeSizeInterrupt => CodeSize
 }
 interrupt! {
     /// Get code hash of this account.
-    GetCodeHashInterrupt,
-    GetCodeHash => CodeHash
+    GetCodeHashInterrupt => CodeHash
 }
 interrupt! {
     /// Get code of this account.
-    CopyCodeInterrupt,
-    CopyCode => Code
+    CopyCodeInterrupt  => Code
 }
 interrupt! {
     /// Selfdestruct this account.
-    SelfdestructInterrupt,
-    Selfdestruct => ()
+    SelfdestructInterrupt  => ()
 }
 interrupt! {
     /// Execute this message as a new call.
-    CallInterrupt,
-    Call => CallOutput
+    CallInterrupt => CallOutput
 }
 interrupt! {
     /// Get `TxContext` for this call.
-    GetTxContextInterrupt,
-    () => TxContextData
+    GetTxContextInterrupt => TxContextData
 }
 interrupt! {
     /// Get block hash for this account.
-    GetBlockHashInterrupt,
-    GetBlockHash => BlockHash
+    GetBlockHashInterrupt => BlockHash
 }
 interrupt! {
     /// Emit log message.
-    EmitLogInterrupt,
-    EmitLog => ()
+    EmitLogInterrupt => ()
 }
 interrupt! {
     /// Access this account and return its status.
-    AccessAccountInterrupt,
-    AccessAccount => AccessAccountStatus
+    AccessAccountInterrupt => AccessAccountStatus
 }
 interrupt! {
     /// Access this storage key and return its status.
-    AccessStorageInterrupt,
-    AccessStorage => AccessStorageStatus
+    AccessStorageInterrupt => AccessStorageStatus
 }
+
+/// Execution complete, this interrupt cannot be resumed.
+pub struct ExecutionComplete(pub(crate) InnerCoroutine);
 
 /// Collection of all possible interrupts. Match on this to get the specific interrupt returned.
 #[derive(From)]
 pub enum InterruptVariant {
-    InstructionStart(InstructionStartInterrupt),
-    AccountExists(AccountExistsInterrupt),
-    GetStorage(GetStorageInterrupt),
-    SetStorage(SetStorageInterrupt),
-    GetBalance(GetBalanceInterrupt),
-    GetCodeSize(GetCodeSizeInterrupt),
-    GetCodeHash(GetCodeHashInterrupt),
-    CopyCode(CopyCodeInterrupt),
-    Selfdestruct(SelfdestructInterrupt),
-    Call(CallInterrupt),
+    InstructionStart(Box<InstructionStart>, InstructionStartInterrupt),
+    AccountExists(AccountExists, AccountExistsInterrupt),
+    GetStorage(GetStorage, GetStorageInterrupt),
+    SetStorage(SetStorage, SetStorageInterrupt),
+    GetBalance(GetBalance, GetBalanceInterrupt),
+    GetCodeSize(GetCodeSize, GetCodeSizeInterrupt),
+    GetCodeHash(GetCodeHash, GetCodeHashInterrupt),
+    CopyCode(CopyCode, CopyCodeInterrupt),
+    Selfdestruct(Selfdestruct, SelfdestructInterrupt),
+    Call(Call, CallInterrupt),
     GetTxContext(GetTxContextInterrupt),
-    GetBlockHash(GetBlockHashInterrupt),
-    EmitLog(EmitLogInterrupt),
-    AccessAccount(AccessAccountInterrupt),
-    AccessStorage(AccessStorageInterrupt),
-    Complete(Result<SuccessfulOutput, StatusCode>),
+    GetBlockHash(GetBlockHash, GetBlockHashInterrupt),
+    EmitLog(EmitLog, EmitLogInterrupt),
+    AccessAccount(AccessAccount, AccessAccountInterrupt),
+    AccessStorage(AccessStorage, AccessStorageInterrupt),
+    Complete(Result<SuccessfulOutput, StatusCode>, ExecutionComplete),
 }

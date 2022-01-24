@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![allow(incomplete_features)]
-#![feature(adt_const_params, generators, generator_trait)]
+#![feature(adt_const_params, generators, generator_trait, never_type)]
 
 use bytes::Bytes;
 pub use common::{

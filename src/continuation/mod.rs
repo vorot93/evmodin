@@ -26,13 +26,9 @@ pub mod resume_data;
 
 /// Paused EVM with full state inside.
 pub trait Interrupt: sealed::Sealed {
-    /// Interrupt data returned.
-    type InterruptData;
     /// Data required to resume execution.
     type ResumeData;
 
-    /// Get interrupt data.
-    fn data(&self) -> &Self::InterruptData;
     /// Resume execution until the next interrupt.
     fn resume(self, resume_data: Self::ResumeData) -> InterruptVariant;
 }
@@ -51,33 +47,51 @@ fn resume_interrupt(mut inner: InnerCoroutine, resume_data: ResumeDataVariant) -
     match Pin::new(&mut *inner).resume(resume_data) {
         GeneratorState::Yielded(interrupt) => match interrupt {
             InterruptDataVariant::InstructionStart(data) => {
-                InstructionStartInterrupt { inner, data }.into()
+                InterruptVariant::InstructionStart(data, InstructionStartInterrupt { inner })
             }
             InterruptDataVariant::AccountExists(data) => {
-                AccountExistsInterrupt { inner, data }.into()
+                InterruptVariant::AccountExists(data, AccountExistsInterrupt { inner })
             }
-            InterruptDataVariant::GetStorage(data) => GetStorageInterrupt { inner, data }.into(),
-            InterruptDataVariant::SetStorage(data) => SetStorageInterrupt { inner, data }.into(),
-            InterruptDataVariant::GetBalance(data) => GetBalanceInterrupt { inner, data }.into(),
-            InterruptDataVariant::GetCodeSize(data) => GetCodeSizeInterrupt { inner, data }.into(),
-            InterruptDataVariant::GetCodeHash(data) => GetCodeHashInterrupt { inner, data }.into(),
-            InterruptDataVariant::CopyCode(data) => CopyCodeInterrupt { inner, data }.into(),
+            InterruptDataVariant::GetStorage(data) => {
+                InterruptVariant::GetStorage(data, GetStorageInterrupt { inner })
+            }
+            InterruptDataVariant::SetStorage(data) => {
+                InterruptVariant::SetStorage(data, SetStorageInterrupt { inner })
+            }
+            InterruptDataVariant::GetBalance(data) => {
+                InterruptVariant::GetBalance(data, GetBalanceInterrupt { inner })
+            }
+            InterruptDataVariant::GetCodeSize(data) => {
+                InterruptVariant::GetCodeSize(data, GetCodeSizeInterrupt { inner })
+            }
+            InterruptDataVariant::GetCodeHash(data) => {
+                InterruptVariant::GetCodeHash(data, GetCodeHashInterrupt { inner })
+            }
+            InterruptDataVariant::CopyCode(data) => {
+                InterruptVariant::CopyCode(data, CopyCodeInterrupt { inner })
+            }
             InterruptDataVariant::Selfdestruct(data) => {
-                SelfdestructInterrupt { inner, data }.into()
+                InterruptVariant::Selfdestruct(data, SelfdestructInterrupt { inner })
             }
-            InterruptDataVariant::Call(data) => CallInterrupt { inner, data }.into(),
-            InterruptDataVariant::GetTxContext => GetTxContextInterrupt { inner, data: () }.into(),
+            InterruptDataVariant::Call(data) => {
+                InterruptVariant::Call(data, CallInterrupt { inner })
+            }
+            InterruptDataVariant::GetTxContext => {
+                InterruptVariant::GetTxContext(GetTxContextInterrupt { inner })
+            }
             InterruptDataVariant::GetBlockHash(data) => {
-                GetBlockHashInterrupt { inner, data }.into()
+                InterruptVariant::GetBlockHash(data, GetBlockHashInterrupt { inner })
             }
-            InterruptDataVariant::EmitLog(data) => EmitLogInterrupt { inner, data }.into(),
+            InterruptDataVariant::EmitLog(data) => {
+                InterruptVariant::EmitLog(data, EmitLogInterrupt { inner })
+            }
             InterruptDataVariant::AccessAccount(data) => {
-                AccessAccountInterrupt { inner, data }.into()
+                InterruptVariant::AccessAccount(data, AccessAccountInterrupt { inner })
             }
             InterruptDataVariant::AccessStorage(data) => {
-                AccessStorageInterrupt { inner, data }.into()
+                InterruptVariant::AccessStorage(data, AccessStorageInterrupt { inner })
             }
         },
-        GeneratorState::Complete(res) => InterruptVariant::Complete(res),
+        GeneratorState::Complete(res) => InterruptVariant::Complete(res, ExecutionComplete(inner)),
     }
 }

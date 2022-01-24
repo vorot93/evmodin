@@ -4,7 +4,7 @@ use criterion::{profiler::Profiler, BatchSize};
 use ethereum_types::Address;
 use ethnum::*;
 use evmodin::{
-    continuation::interrupt::ExecutionStartInterrupt,
+    continuation::interrupt::{ExecutionComplete, ExecutionStartInterrupt},
     instructions::{instruction_table::get_baseline_instruction_table, PROPERTIES},
     tracing::NoopTracer,
     util::{mocked_host::MockedHost, Bytecode},
@@ -329,8 +329,8 @@ fn execute_with_output(i: ExecutionStartInterrupt) -> Output {
 }
 
 #[inline(always)]
-fn execute(i: ExecutionStartInterrupt) {
-    execute_with_output(i);
+fn execute(i: ExecutionStartInterrupt) -> (Output, ExecutionComplete) {
+    i.run_to_completion_with_host2(&mut MockedHost::default(), &mut NoopTracer, None)
 }
 
 fn synthetic_benchmarks(c: &mut Criterion) {
