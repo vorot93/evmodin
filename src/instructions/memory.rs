@@ -18,7 +18,6 @@ pub(crate) fn mload(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let index = state.stack.pop();
 
     let region = verify_memory_region_u64(state, index, NonZeroUsize::new(32).unwrap())
-        .map(|region| region.unwrap())
         .map_err(|_| StatusCode::OutOfGas)?;
 
     let value =
@@ -34,7 +33,6 @@ pub(crate) fn mstore(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let value = state.stack.pop();
 
     let region = verify_memory_region_u64(state, index, NonZeroUsize::new(32).unwrap())
-        .map(|region| region.unwrap())
         .map_err(|_| StatusCode::OutOfGas)?;
 
     let mut b = [0; 32];
@@ -49,7 +47,6 @@ pub(crate) fn mstore8(state: &mut ExecutionState) -> Result<(), StatusCode> {
     let value = state.stack.pop();
 
     let region = verify_memory_region_u64(state, index, NonZeroUsize::new(1).unwrap())
-        .map(|region| region.unwrap())
         .map_err(|_| StatusCode::OutOfGas)?;
 
     let value = (value.low_u32() & 0xff) as u8;
@@ -67,7 +64,7 @@ pub(crate) fn verify_memory_region_u64(
     state: &mut ExecutionState,
     offset: U256,
     size: NonZeroUsize,
-) -> Result<Option<MemoryRegion>, ()> {
+) -> Result<MemoryRegion, ()> {
     if offset > U256::from(MAX_BUFFER_SIZE) {
         return Err(());
     }
@@ -92,10 +89,10 @@ pub(crate) fn verify_memory_region_u64(
             .resize((new_words * WORD_SIZE) as usize, Default::default());
     }
 
-    Ok(Some(MemoryRegion {
+    Ok(MemoryRegion {
         offset: offset.as_usize(),
         size,
-    }))
+    })
 }
 
 pub(crate) struct MemoryRegion {
@@ -116,7 +113,7 @@ pub(crate) fn verify_memory_region(
         return Err(());
     }
 
-    verify_memory_region_u64(state, offset, NonZeroUsize::new(size.as_usize()).unwrap())
+    verify_memory_region_u64(state, offset, NonZeroUsize::new(size.as_usize()).unwrap()).map(Some)
 }
 
 pub(crate) fn calldatacopy(state: &mut ExecutionState) -> Result<(), StatusCode> {
