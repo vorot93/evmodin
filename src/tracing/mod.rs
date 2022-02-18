@@ -16,6 +16,7 @@ pub trait Tracer {
 }
 
 /// Tracer which does nothing.
+#[derive(Clone, Debug)]
 pub struct NoopTracer;
 
 impl Tracer for NoopTracer {
